@@ -18,6 +18,10 @@ substitutions:
   weather_entity: weather.home
   room_temp_entity: sensor.room_temperature
   room_hum_entity: sensor.room_humidity
+  # Control-tile entities (swipe up). Change to your own.
+  lamp_entity: light.desk_lamp
+  neon_entity: switch.neon
+  led_entity: light.led_strip
 
 esphome:
   name: ${name}
@@ -2501,7 +2505,7 @@ text_sensor:
   # Light states -> tile color on the controls screen (on=color, off=dark)
   - platform: homeassistant
     id: st_lamp
-    entity_id: light.desk_lamp
+    entity_id: ${lamp_entity}
     on_value:
       - if:
           condition: { lambda: 'return x == "on";' }
@@ -2509,7 +2513,7 @@ text_sensor:
           else: [lvgl.widget.update: { id: tile_lamp, bg_color: 0x242426 }]
   - platform: homeassistant
     id: st_neon
-    entity_id: switch.neon
+    entity_id: ${neon_entity}
     on_value:
       - lambda: 'id(g_neon_on) = (x == "on");'
       - if:
@@ -2519,7 +2523,7 @@ text_sensor:
       - script.execute: game_render
   - platform: homeassistant
     id: st_led
-    entity_id: light.led_strip
+    entity_id: ${led_entity}
     on_value:
       - lambda: 'id(g_led_on) = (x == "on");'
       - if:
@@ -3451,7 +3455,7 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             on_click:
-              - homeassistant.action: { action: light.toggle, data: { entity_id: light.desk_lamp } }
+              - homeassistant.action: { action: light.toggle, data: { entity_id: ${lamp_entity} } }
             widgets:
               - label: { align: CENTER, y: -16, text: "󰌵", text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "Lamp", text_font: font_artist, text_color: 0xFFFFFF }
@@ -3467,7 +3471,7 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             on_click:
-              - homeassistant.action: { action: switch.toggle, data: { entity_id: switch.neon } }
+              - homeassistant.action: { action: switch.toggle, data: { entity_id: ${neon_entity} } }
             widgets:
               - label: { align: CENTER, y: -16, text: "󰉁", text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "Neon", text_font: font_artist, text_color: 0xFFFFFF }
@@ -3483,7 +3487,7 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             on_click:
-              - homeassistant.action: { action: light.toggle, data: { entity_id: light.led_strip } }
+              - homeassistant.action: { action: light.toggle, data: { entity_id: ${led_entity} } }
             widgets:
               - label: { align: CENTER, y: -16, text: "󰟙", text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "LED strip", text_font: font_artist, text_color: 0xFFFFFF }
@@ -3502,11 +3506,11 @@ lvgl:
               - if:
                   condition: { lambda: 'return id(g_neon_on) && id(g_led_on);' }
                   then:
-                    - homeassistant.action: { action: light.turn_off, data: { entity_id: light.led_strip } }
-                    - homeassistant.action: { action: switch.turn_off, data: { entity_id: switch.neon } }
+                    - homeassistant.action: { action: light.turn_off, data: { entity_id: ${led_entity} } }
+                    - homeassistant.action: { action: switch.turn_off, data: { entity_id: ${neon_entity} } }
                   else:
-                    - homeassistant.action: { action: light.turn_on, data: { entity_id: light.led_strip } }
-                    - homeassistant.action: { action: switch.turn_on, data: { entity_id: switch.neon } }
+                    - homeassistant.action: { action: light.turn_on, data: { entity_id: ${led_entity} } }
+                    - homeassistant.action: { action: switch.turn_on, data: { entity_id: ${neon_entity} } }
             widgets:
               - label: { align: CENTER, y: -16, text: "󰊴", text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "Game mode", text_font: font_artist, text_color: 0xFFFFFF }
