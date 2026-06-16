@@ -51,9 +51,11 @@ handler. It reads/writes only the shared core globals above.
 
 ## Status
 
-- [ ] core refactor: data-driven carousel (`g_order`), nav via `g_nav_req`, knob via
-      `g_knob_capture`/`g_knob_delta`, scores via `g_scores_reset`
-- [ ] extract Space Wars -> `screens/space-wars.yaml`
-- [ ] extract Cool Cars -> `screens/cool-cars.yaml`
-- [ ] extract Timer -> `screens/timer.yaml`
-- [ ] verify on device, then consider merging to `main`
+- [x] core refactor: data-driven carousel (`g_order`), nav via `g_nav_req`, knob via
+      `g_knob_capture`/`g_knob_delta`. Score storage (`g_top`/`g_best`/`g_sw_top`/`g_sw_best`)
+      stays in the core so reset/factory work without the game screens.
+- [x] extract Space Wars -> `screens/space-wars.yaml`
+- [x] extract Cool Cars -> `screens/cool-cars.yaml`
+- [x] verified on device (compiles; both games toggle on/off from the `files:` list)
+- [ ] (optional) extract Timer -> `screens/timer.yaml`
+- [ ] consider merging `beta` -> `main` (update README/wiki for the packages layout)
