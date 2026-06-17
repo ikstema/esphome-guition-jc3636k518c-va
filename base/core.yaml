@@ -203,6 +203,13 @@ api:
 ota:
   - platform: esphome
 
+# OTA rollback safety. On esp-idf the bootloader rolls back to the PREVIOUS firmware if the device
+# resets before the boot is marked "good" (default 1 min). That is why a quick "Restart" from the
+# menu right after flashing booted the OLD build again. We shorten that window AND mark the boot good
+# as soon as the splash finishes (see the boot interval -> safe_mode.mark_successful).
+safe_mode:
+  boot_is_good_after: 30s
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -2247,6 +2254,7 @@ interval:
                 then:
                   - lambda: 'id(g_boot) = false;'
                   - light.turn_off: ring_light                        # stop the boot ring animation
+                  - safe_mode.mark_successful:                        # commit this OTA image now so a restart won't roll back to the old firmware
                   - lvgl.page.show: { id: page_home, animation: fade_in, time: 400ms }
   - interval: 2s
     then:
