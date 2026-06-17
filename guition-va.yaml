@@ -1,11 +1,12 @@
 ###############################################################################
-# Guition JC3636K718C (1.8" 360x360 ROUND KNOB, ESP32-S3) - BASE
+# Guition JC3636K718C (1.8" 360x360 ROUND KNOB, ESP32-S3) - core config
 # Pins and init_sequence from the OFFICIAL manufacturer demo (JC3636K718_knob_EN),
 # files pincfg.h + scr_st77916.h. This is the correct pinout for THIS board
 # (different from the JC3636W518!).
 #
-# Scope: display (ST77916/QSPI) + touch (CST816) + backlight + speaker (DAC).
-# Voice assistant / microphone / knob added once the display is confirmed working.
+# Always-on core: display (ST77916/QSPI) + touch (CST816) + knob + audio + voice assistant +
+# LED ring + the clock home screen, control tiles and settings. Optional carousel screens
+# (player, timer, games, weather, demo) live as packages in screens/ - see screens/README.md.
 ###############################################################################
 
 substitutions:
@@ -18,19 +19,21 @@ substitutions:
   weather_entity: weather.home
   room_temp_entity: sensor.room_temperature
   room_hum_entity: sensor.room_humidity
-  # Control tiles (swipe up): 4 toggleable HA entities, each with an MDI icon glyph + a name.
-  # Works on any domain (uses homeassistant.toggle). The icons compile from these glyphs.
+  # Control tiles (swipe up): 4 toggleable HA entities, each with an icon + a name. Any domain.
+  # tileN_icon = a name from the built-in set: bulb lamp led power plug switch fan ac heater
+  # thermometer lock unlock door blinds tv speaker bell wifi home flash. The same icon may
+  # repeat across tiles. (For an icon outside the set, paste its glyph or a \U000Fxxxx code.)
   tile1_entity: light.desk_lamp
-  tile1_icon: "󰌵"
+  tile1_icon: "bulb"
   tile1_name: "Lamp"
   tile2_entity: switch.neon
-  tile2_icon: "󰉁"
+  tile2_icon: "flash"
   tile2_name: "Neon"
   tile3_entity: light.led_strip
-  tile3_icon: "󰟙"
+  tile3_icon: "led"
   tile3_name: "LED strip"
   tile4_entity: light.desk_lamp
-  tile4_icon: "󰊴"
+  tile4_icon: "power"
   tile4_name: "Tile 4"
   # Carousel screen order (left-to-right). Screens not included in the build are skipped.
   forecast_entity: sensor.va_weekly_forecast   # HA helper sensor (see screens/weather.ha-helper.yaml)
@@ -62,14 +65,43 @@ esphome:
             id(g_set_labels) += "\nWidgets";    id(g_set_items)[id(g_set_n)++] = 17;
             id(g_set_labels) += "\nRing";      id(g_set_items)[id(g_set_n)++] = 16;
             id(g_set_labels) += "\nAssistant"; id(g_set_items)[id(g_set_n)++] = 13;
+    - priority: 760
+      then:
+        - lambda: |-
+            // Resolve a friendly icon name to its MDI glyph. Unknown -> use the value as-is.
+            auto ic = [](const std::string &s) -> std::string {
+              if (s == "bulb" || s == "light") return "\U000f0335";
+              if (s == "lamp") return "\U000f06b5";
+              if (s == "led" || s == "strip") return "\U000f07d9";
+              if (s == "power") return "\U000f0425";
+              if (s == "plug") return "\U000f06a5";
+              if (s == "switch") return "\U000f0521";
+              if (s == "fan") return "\U000f0210";
+              if (s == "ac" || s == "aircon") return "\U000f001b";
+              if (s == "heater" || s == "radiator") return "\U000f0438";
+              if (s == "thermometer" || s == "temp") return "\U000f050f";
+              if (s == "lock") return "\U000f033e";
+              if (s == "unlock") return "\U000f033f";
+              if (s == "door") return "\U000f081a";
+              if (s == "blinds") return "\U000f00ac";
+              if (s == "tv") return "\U000f0502";
+              if (s == "speaker") return "\U000f04c3";
+              if (s == "bell") return "\U000f009a";
+              if (s == "wifi") return "\U000f05a9";
+              if (s == "home") return "\U000f02dc";
+              if (s == "flash") return "\U000f0241";
+              return s;
+            };
+            id(g_tile1_glyph) = ic("${tile1_icon}");
+            id(g_tile2_glyph) = ic("${tile2_icon}");
+            id(g_tile3_glyph) = ic("${tile3_icon}");
+            id(g_tile4_glyph) = ic("${tile4_icon}");
     - priority: 605
       then:
-        - lambda: 'id(g_set_labels) += "
-Restart"; id(g_set_items)[id(g_set_n)++] = 9;'
+        - lambda: 'id(g_set_labels) += "\nRestart"; id(g_set_items)[id(g_set_n)++] = 9;'
     - priority: 595
       then:
-        - lambda: 'id(g_set_labels) += "
-System"; id(g_set_items)[id(g_set_n)++] = 15;'   # always last
+        - lambda: 'id(g_set_labels) += "\nSystem"; id(g_set_items)[id(g_set_n)++] = 15;'   # always last
     - priority: 600
       then:
         - lambda: |-
@@ -652,6 +684,18 @@ globals:
     type: bool
     restore_value: yes
     initial_value: 'false'
+  - id: g_tile1_glyph
+    type: std::string
+    restore_value: no
+  - id: g_tile2_glyph
+    type: std::string
+    restore_value: no
+  - id: g_tile3_glyph
+    type: std::string
+    restore_value: no
+  - id: g_tile4_glyph
+    type: std::string
+    restore_value: no
 
 # Shows the volume arc for ~2 s while turning the knob, then hides it (mode: restart)
 script:
@@ -1507,8 +1551,8 @@ touchscreen:
               then:
                 - lambda: 'id(g_mode) = 5; id(g_set_idx) = 0;'
                 - script.execute: ui_render
-          # Horizontal carousel: timer ← clock → player (g_base: 0=clock 1=player 2=timer)
-          # 5-screen carousel: timer ↔ clock ↔ player ↔ Car ↔ Space (loop). Leaving a game = reset.
+          # Horizontal carousel: swipe steps through g_order (built from screen_order at boot),
+          # wrapping around. Each screen shows itself via show_base / its nav handler.
           - if:   # swipe ← -> next
               condition: { lambda: 'return id(g_gesture) == 2;' }
               then:
@@ -2005,10 +2049,27 @@ font:
     size: 34
     bpp: 4
     glyphs:
-      - "${tile1_icon}"
-      - "${tile2_icon}"
-      - "${tile3_icon}"
-      - "${tile4_icon}"
+      # smart-home icon set (reference these by name in tileN_icon)
+      - "\U000f0335"
+      - "\U000f06b5"
+      - "\U000f07d9"
+      - "\U000f0425"
+      - "\U000f06a5"
+      - "\U000f0521"
+      - "\U000f0210"
+      - "\U000f001b"
+      - "\U000f0438"
+      - "\U000f050f"
+      - "\U000f033e"
+      - "\U000f033f"
+      - "\U000f081a"
+      - "\U000f00ac"
+      - "\U000f0502"
+      - "\U000f04c3"
+      - "\U000f009a"
+      - "\U000f05a9"
+      - "\U000f02dc"
+      - "\U000f0241"
       - "󰖐"
       - "󰖑"
       - "󰖓"
@@ -2715,7 +2776,7 @@ lvgl:
             on_click:
               - homeassistant.action: { action: homeassistant.toggle, data: { entity_id: "${tile1_entity}" } }
             widgets:
-              - label: { align: CENTER, y: -16, text: "${tile1_icon}", text_font: icons34, text_color: 0xFFFFFF }
+              - label: { align: CENTER, y: -16, text: !lambda 'return id(g_tile1_glyph);', text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "${tile1_name}", text_font: font_artist, text_color: 0xFFFFFF }
         - button:
             id: tile2
@@ -2731,7 +2792,7 @@ lvgl:
             on_click:
               - homeassistant.action: { action: homeassistant.toggle, data: { entity_id: "${tile2_entity}" } }
             widgets:
-              - label: { align: CENTER, y: -16, text: "${tile2_icon}", text_font: icons34, text_color: 0xFFFFFF }
+              - label: { align: CENTER, y: -16, text: !lambda 'return id(g_tile2_glyph);', text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "${tile2_name}", text_font: font_artist, text_color: 0xFFFFFF }
         - button:
             id: tile3
@@ -2747,7 +2808,7 @@ lvgl:
             on_click:
               - homeassistant.action: { action: homeassistant.toggle, data: { entity_id: "${tile3_entity}" } }
             widgets:
-              - label: { align: CENTER, y: -16, text: "${tile3_icon}", text_font: icons34, text_color: 0xFFFFFF }
+              - label: { align: CENTER, y: -16, text: !lambda 'return id(g_tile3_glyph);', text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "${tile3_name}", text_font: font_artist, text_color: 0xFFFFFF }
         - button:
             id: tile4
@@ -2763,5 +2824,5 @@ lvgl:
             on_click:
               - homeassistant.action: { action: homeassistant.toggle, data: { entity_id: "${tile4_entity}" } }
             widgets:
-              - label: { align: CENTER, y: -16, text: "${tile4_icon}", text_font: icons34, text_color: 0xFFFFFF }
+              - label: { align: CENTER, y: -16, text: !lambda 'return id(g_tile4_glyph);', text_font: icons34, text_color: 0xFFFFFF }
               - label: { align: CENTER, y: 26, width: 100, long_mode: wrap, text_align: CENTER, text: "${tile4_name}", text_font: font_artist, text_color: 0xFFFFFF }
