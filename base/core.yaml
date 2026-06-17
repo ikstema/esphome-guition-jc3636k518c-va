@@ -169,6 +169,7 @@ esphome:
     - priority: -100
       then:
         - light.turn_on: { id: ring_light, effect: "Rainbow", brightness: 55% }   # boot splash: spin the ring while "HELLO!" shows (turned off when the splash ends)
+        - lambda: 'const char* tz = getenv("TZ"); if (tz && tz[0]) id(g_tz_posix) = tz;'   # remember the resolved POSIX zone set at setup, so the 1s interval can re-apply it if it gets reset to UTC
         - script.execute: night_apply    # brightness per g_bright / night mode
         - script.execute: disp_apply     # show/hide weather + temp/humidity per settings
         - script.execute: settings_build # push the dynamic settings list into the roller
@@ -591,6 +592,9 @@ globals:
     type: bool
     restore_value: yes
     initial_value: 'true'
+  - id: g_tz_posix     # resolved POSIX timezone captured at boot (to re-apply if runtime resets it to UTC)
+    type: std::string
+    restore_value: no
   - id: g_set_idx      # selected item in the settings list (roller)
     type: int
     restore_value: no
@@ -2274,7 +2278,7 @@ interval:
       # TZ self-heal: some ESPHome builds reset the device timezone to UTC at runtime (e.g. on a
       # menu restart or when a log/API client without a TZ reconnects), so the clock briefly jumps
       # to UTC. Re-apply our already-resolved zone every tick so it never drifts. (No-op if correct.)
-      - lambda: 'id(ha_time).set_timezone(id(ha_time).get_timezone());'
+      - lambda: 'if (!id(g_tz_posix).empty()) { setenv("TZ", id(g_tz_posix).c_str(), 1); tzset(); }'
       # Battery: while charging - "filling" animation; when full (≥99%) - static full icon.
       - lambda: 'if (id(g_charging)) id(g_chg_anim) = (id(g_chg_anim) + 1) % 5;'
       - script.execute: batt_render
