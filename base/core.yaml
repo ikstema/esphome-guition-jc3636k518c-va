@@ -301,6 +301,7 @@ time:
 # AUDIO - DAC PCM5100A (3.5 mm jack, no built-in speaker) + I2S mic + voice assistant
 # DAC:  BCK=18  WS=16  DO=17   MUTE=48 (LOW=mute -> hold HIGH)
 # MIC:  data=46  WS=45  BCK=42  (digital I2S, not PDM)
+# GPIO16-18 are shared with QSPI display data lines on this board -> allow_other_uses
 ###############################################################################
 switch:
   - platform: gpio
@@ -311,8 +312,12 @@ switch:
 
 i2s_audio:
   - id: i2s_out
-    i2s_bclk_pin: GPIO18
-    i2s_lrclk_pin: GPIO16
+    i2s_bclk_pin:
+      number: GPIO18
+      allow_other_uses: true
+    i2s_lrclk_pin:
+      number: GPIO16
+      allow_other_uses: true
   - id: i2s_in
     i2s_lrclk_pin: GPIO45
     i2s_bclk_pin: GPIO42
@@ -322,7 +327,9 @@ speaker:
   - platform: i2s_audio
     id: i2s_speaker_raw
     i2s_audio_id: i2s_out
-    i2s_dout_pin: GPIO17
+    i2s_dout_pin:
+      number: GPIO17
+      allow_other_uses: true
     dac_type: external
     channel: stereo
   # Mixer: combines the music channel and the announcement (TTS) channel on one speaker
@@ -1480,7 +1487,14 @@ spi:
   id: display_qspi
   type: quad
   clk_pin: 13
-  data_pins: [15, 16, 17, 18]
+  data_pins:
+    - 15
+    - number: 16
+      allow_other_uses: true
+    - number: 17
+      allow_other_uses: true
+    - number: 18
+      allow_other_uses: true
 
 i2c:
   sda: 11
