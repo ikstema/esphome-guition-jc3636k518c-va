@@ -11,7 +11,7 @@
 substitutions:
   name: voice-knob
   friendly_name: "Voice Knob"
-  github_user: "anton"
+  github_user: "ikstema"
   github_repo: "esphome-guition-jc3636k518c-va"
   # Clock timezone. HA does not push its zone to the device, so set yours here. Use a friendly IANA
   # name (e.g. Europe/Warsaw, America/New_York) - core maps the common ones to the POSIX form the

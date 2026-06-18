@@ -16,7 +16,7 @@
 substitutions:
   name: voice-knob
   friendly_name: "Voice Knob"
-  github_user: "anton"
+  github_user: "ikstema"
   github_repo: "esphome-guition-jc3636k518c-va"
   github_ref: main
   timezone: "Europe/Warsaw"   # IANA name; core maps common zones to POSIX. Zone not listed? paste a POSIX string (github.com/nayarsystems/posix_tz_db). DST automatic.
