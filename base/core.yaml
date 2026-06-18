@@ -1676,8 +1676,8 @@ drv2605:
   id: haptic_driver
   i2c_id: touchscreen_bus
   address: 0x5A
-  motor_type: LRA
-  library: 6
+  motor_type: ERM
+  library: 1
 
 output:
   - platform: ledc

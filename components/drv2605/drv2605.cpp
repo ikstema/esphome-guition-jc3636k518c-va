@@ -24,8 +24,9 @@ void DRV2605Component::setup() {
     this->mark_failed();
     return;
   }
+  delay(1);
 
-  // Configure motor type / LRA actuator constants (K518 demo: 1.2Vrms, 1.7V clamp)
+  // Configure the actuator. The K518 board uses an ERM motor in open-loop mode.
   if (this->is_lra_) {
     if (!this->write_register_(DRV2605_REG_RATEDV, 0x2F) ||
         !this->write_register_(DRV2605_REG_CLAMPV, 0x59) ||
@@ -53,18 +54,29 @@ void DRV2605Component::setup() {
       ESP_LOGCONFIG(TAG, "DRV2605 LRA autocal finished");
     }
   } else {
-    if (!this->write_register_(DRV2605_REG_FEEDBACK, 0x00)) {
-      ESP_LOGE(TAG, "Failed to set motor type");
+    uint8_t feedback = 0;
+    uint8_t control3 = 0;
+    if (!this->read_register_(DRV2605_REG_FEEDBACK, &feedback) ||
+        !this->read_register_(DRV2605_REG_CONTROL3, &control3) ||
+        !this->write_register_(DRV2605_REG_FEEDBACK, feedback & 0x7F) ||
+        !this->write_register_(DRV2605_REG_CONTROL3, control3 | 0x20)) {
+      ESP_LOGE(TAG, "Failed to configure ERM open-loop mode");
       this->mark_failed();
       return;
     }
   }
 
-  // Select library
-  this->select_library_(this->library_);
-
-  // Set to internal trigger mode
-  this->set_mode_(DRV2605_MODE_INTTRIG);
+  if (!this->write_register_(DRV2605_REG_RTPIN, 0x00) ||
+      !this->write_register_(DRV2605_REG_OVERDRIVE, 0x00) ||
+      !this->write_register_(DRV2605_REG_SUSTAINPOS, 0x00) ||
+      !this->write_register_(DRV2605_REG_SUSTAINNEG, 0x00) ||
+      !this->write_register_(DRV2605_REG_BREAK, 0x00) ||
+      !this->write_register_(DRV2605_REG_LIBRARY, this->library_) ||
+      !this->write_register_(DRV2605_REG_MODE, DRV2605_MODE_INTTRIG)) {
+    ESP_LOGE(TAG, "Failed to finish DRV2605 configuration");
+    this->mark_failed();
+    return;
+  }
 
   ESP_LOGCONFIG(TAG, "DRV2605 setup complete");
 }

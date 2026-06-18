@@ -12,7 +12,8 @@ Ported from [esphome-guition-jc3636k718c-va](https://github.com/MichalZaniewicz/
 
 - **Knob:** quadrature encoder GPIO8 (A) / GPIO7 (B) — `rotary_encoder`, not K718 pulse pins.
 - **Audio:** plug headphones/speakers into the **3.5 mm jack** for TTS and media.
-- **Haptic:** DRV2605 on I²C (0x5A) replaces the K718 LED ring; Settings → **Haptic**.
+- **Haptic:** DRV2605 on I²C (0x5A) drives the onboard ERM motor in open-loop mode
+  and replaces the K718 LED ring; Settings → **Haptic**.
 - **First flash:** USB only (16 MB `partitions.csv`); flash the **ESP32-S3**, not the secondary MCU.
 
 ## Quick start
