@@ -1,22 +1,24 @@
 # =============================================================================
-# Voice Knob - YOUR config. This is the only firmware file you keep locally.
+# Voice Knob (JC3636K518C) - YOUR config. This is the only file you keep locally.
 # -----------------------------------------------------------------------------
-# Copy THIS file (+ partitions.csv + a secrets.yaml) next to each other, edit the
+# Copy THIS file (+ partitions.csv + secrets.yaml) next to each other, edit the
 # entities/tiles below to match your Home Assistant, then:
 #
 #   esphome run guition-va.yaml
 #
-# Everything else (the firmware core + the optional screens) is pulled from GitHub
-# at compile time - see the `packages:` block at the bottom - so you only ever
-# maintain this one file. To get the latest changes:
+# Firmware core + optional screens are pulled from GitHub at compile time
+# (see `packages:` below). To get the latest changes:
 #
-#   esphome clean guition-va.yaml   # clears the package cache
+#   esphome clean guition-va.yaml
 #   esphome run   guition-va.yaml
 # =============================================================================
 
 substitutions:
   name: voice-knob
   friendly_name: "Voice Knob"
+  github_user: "anton"
+  github_repo: "esphome-guition-jc3636k518c-va"
+  github_ref: main
   timezone: "Europe/Warsaw"   # IANA name; core maps common zones to POSIX. Zone not listed? paste a POSIX string (github.com/nayarsystems/posix_tz_db). DST automatic.
   # For album art: base URL of your HA + the media_player entity
   ha_base_url: "http://homeassistant.local:8123"
@@ -77,23 +79,20 @@ substitutions:
 
 packages:
   core:
-    url: https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va
-    ref: main
-    # Pick your screens here: comment out a base/screens/*.yaml line to drop that screen
-    # from the firmware. Only the clock + controls + settings live in base/core.yaml
-    # (always on); everything below is optional.
+    url: https://github.com/${github_user}/${github_repo}
+    ref: ${github_ref}
     files:
       - base/core.yaml
-      - base/screens/player.yaml       # optional: music player (album art + transport)
-      - base/screens/timer.yaml        # optional: timer screen in the carousel (voice timers/alarm stay regardless)
-      - base/screens/cool-cars.yaml    # optional: Cool Cars game
-      - base/screens/space-wars.yaml   # optional: Space Wars game
-      - base/screens/snake.yaml        # optional: Snake game (knob steers)
-      - base/screens/weather.yaml      # optional: weather (today + 7-day, knob scrolls days)
-      - base/screens/thermostat.yaml   # optional: thermostat (climate.* entity; knob sets target, tap on/off)
-      - base/screens/sensors.yaml      # optional: sensors glance (1-6 HA entities, knob cycles)
-      - base/screens/demo.yaml         # optional: commented example screen (TAP ME!) + Widgets settings
-    refresh: 0s        # always pull the latest beta (set to e.g. 1d once it stabilizes)
+      - base/screens/player.yaml
+      - base/screens/timer.yaml
+      - base/screens/cool-cars.yaml
+      - base/screens/space-wars.yaml
+      - base/screens/snake.yaml
+      - base/screens/weather.yaml
+      - base/screens/thermostat.yaml
+      - base/screens/sensors.yaml
+      - base/screens/demo.yaml
+    refresh: 0s
 
 # Wi-Fi comes from your local secrets.yaml (the core uses !secret wifi_ssid / wifi_password).
 # Keep a secrets.yaml and partitions.csv next to this file (both must be local paths).

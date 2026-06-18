@@ -1,142 +1,64 @@
+# ESPHome Voice Assistant for the Guition JC3636K518C (K5 Knob)
 
+A full-featured **Home Assistant Voice Assistant** for the **Guition JC3636K518C**
+/ Waveshare ESP32-S3-Knob-Touch-LCD-1.8 — 1.8" round 360×360 touch display with a
+**quadrature rotary knob**, **3.5 mm audio jack** (no built-in speaker), I²S microphone,
+and **DRV2605 haptic** motor (no WS2812 LED ring).
 
-![ESPHome + Home Assistant Voice Assistant on the Guition JC3636K718C](assets/header.jpg)
+Ported from [esphome-guition-jc3636k718c-va](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va)
+(K718C hardware layer replaced for K518 pins and haptic feedback).
 
-# ESPHome Voice Assistant for the Guition JC3636K718C (round knob display)
+## Hardware notes (K518)
 
-A full-featured **Home Assistant Voice Assistant** running on the **Guition
-JC3636K718C** - a 1.8" round 360×360 touch display with a rotary knob, speaker,
-microphone and an **addressable LED ring**. It's pure ESPHome (no custom C firmware):
-an always-on core plus optional screen packages you pick from one thin config.
-
-It started as "my kid needs a physical timer" and turned into a whole puck. 🙂
-
-## Demo
-
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/e945f4ec-b80f-4740-9130-ed93bd2ab31b" controls width="400"></video>
-</div>
-
-## What it does
-
-- **Voice assistant** - on-device wake word ("Alexa") via `micro_wake_word`, full
-  Home Assistant Assist pipeline (STT / LLM / TTS), wake beep + music ducking. You can also
-  press and hold the screen to talk (toggleable in Settings).
-- **Boot splash** - a short "HELLO!" greeting with a spinning ring on startup, then the clock.
-- **Music player** - `speaker` media player visible in HA / Music Assistant, with
-  album art, title/artist, transport buttons and a progress bar.
-- **Timers** - set by knob or by voice; big countdown with a depleting ring,
-  pause/stop, and an alarm (sound + on-screen + LED) when it finishes.
-- **Device control** - a tiles screen toggling your lights/switches.
-- **Home screen** - clock, date, battery, weather + room temp/humidity.
-- **More screens** (all optional, knob-driven) - a weather forecast dial, a thermostat for
-  any `climate` entity, and a configurable multi-sensor glance.
-- **LED ring** - controllable from HA *and* reactive: assistant (comet/spinner/wave),
-  timer countdown, alarm flash, volume bar - each reaction toggleable in Settings.
-- **Two built-in arcade games** (a lane racer and a vertical shooter) for the kid.
-
-Everything is navigated with **swipes + taps on the screen** and the **rotary knob**.
-
-## Screens
-
-| Screen | View |
-|:---:|---|
-| <img src="assets/screens/home.png" width="170"> | **Home / Clock**<br>Time, date, battery (a bolt while charging), outdoor weather and room temperature + humidity. |
-| <img src="assets/screens/player.png" width="170"> | **Player**<br>Album art, title & artist, prev / play-pause / next and a progress bar. Auto-shows when playback starts. |
-| <img src="assets/screens/controls.png" width="170"> | **Control tiles** (swipe up)<br>Four configurable tiles toggling any HA entity; each has its own icon and label, and the colour follows the live on/off state. |
-| <img src="assets/screens/weather.png" width="170"> | **Weather**<br>Today plus a 7-day radial dial; turn the knob to scroll days. Centre shows the day, condition and high/low. |
-| <img src="assets/screens/thermostat.png" width="170"> | **Thermostat**<br>A dial for a `climate.*` entity; the knob sets the target, tap toggles on/off. Accent colour follows heating / cooling / idle. |
-| <img src="assets/screens/sensors.png" width="170"> | **Sensors**<br>A glance of 1-6 configurable Home Assistant entities, shown big one at a time; turn the knob to cycle (dots show the position). Any entity, pulled straight from HA. |
-| <img src="assets/screens/timer.png" width="170"> | **Timer**<br>Set by knob or voice; big countdown with a depleting ring, pause/stop, and an alarm when it finishes. |
-| <img src="assets/screens/cool-cars.png" width="170"> | **Cool Cars**<br>A lane-racing arcade game - the knob steers, dodge traffic and grab coins. |
-| <img src="assets/screens/space-wars.png" width="170"> | **Space Wars**<br>A vertical space shooter - the knob steers, auto-fire, survive the waves. |
-| <img src="assets/screens/snake.png" width="170"> | **Snake 360**<br>A smooth-steering 360-degree snake - turn the knob to steer the head and the body trails behind, across the whole round screen. |
-| <img src="assets/screens/settings.png" width="170"> | **Settings** (swipe down)<br>Display, Home, Widgets, Ring, Assistant, System; turn the knob to scroll, tap to enter. |
-| <img src="assets/screens/demo.png" width="170"> | **Demo**<br>A small, heavily commented example screen (tap flips black ↔ white) to copy when building your own. |
-
-> Optional screens (player, timer, games, weather, thermostat, sensors, demo) are pickable - choose which compile in and their order; see [Configuration](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Configuration).
-
-## Documentation
-
-Full docs live in the **[wiki](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki)**:
-
-| Page | What's inside |
-|---|---|
-| [Hardware](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Hardware) | Board specs, full pinout, what to buy on AliExpress |
-| [Installation](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Installation) | Requirements, first flash (USB), OTA, the bundled sounds |
-| [Usage](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Usage) | Gestures, screens, the settings menu, the LED ring |
-| [Configuration](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Configuration) | Change entities, tiles, wake word, run without Music Assistant |
-| [Troubleshooting](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Troubleshooting) | Known issues (battery %, GPIO0 strapping, performance, the knob) |
-
-Release history: [CHANGELOG.md](CHANGELOG.md).
+- **Knob:** quadrature encoder GPIO8 (A) / GPIO7 (B) — `rotary_encoder`, not K718 pulse pins.
+- **Audio:** plug headphones/speakers into the **3.5 mm jack** for TTS and media.
+- **Haptic:** DRV2605 on I²C (0x5A) replaces the K718 LED ring; Settings → **Haptic**.
+- **First flash:** USB only (16 MB `partitions.csv`); flash the **ESP32-S3**, not the secondary MCU.
 
 ## Quick start
 
-1. Copy `secrets.example.yaml` → `secrets.yaml` and fill in your Wi-Fi.
-2. Copy **`guition-va.yaml`** and **`partitions.csv`** so they sit together with `secrets.yaml`. Edit the `substitutions:` at the top of `guition-va.yaml` (HA URL + your entity IDs + the four control tiles). That thin file is the only firmware file you keep - the core and all screens are **pulled from GitHub at compile time** (see its `packages:` block), as are the fonts, images and sounds.
-3. Choose which screens compile in via the `files:` list and their left-to-right order via `screen_order`, both in `guition-va.yaml`.
-4. **First flash over USB** - easiest via the **ESPHome dashboard** (GUI) or the CLI; the 16 MB partition table can't be set over OTA, so the first flash is USB, then updates go wireless.
-5. In Home Assistant: open the new ESPHome device → assign an Assist pipeline.
-
-To pull the latest changes later: `esphome clean guition-va.yaml` (clears the package cache) then `esphome run guition-va.yaml`.
-
-Full details on the [Installation](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Installation) wiki page.
+1. Copy `secrets.example.yaml` → `secrets.yaml` and fill in Wi‑Fi.
+2. Edit `guition-va.yaml` (`substitutions:` for HA entities, `github_user` for your fork).
+3. **In-repo build:** `packages:` uses local `files:` (default). **Thin deploy** from another
+   folder: uncomment `url` / `ref` in `guition-va.yaml` so firmware pulls from your GitHub.
+4. Generate sounds (once): `python scripts/make_sounds.py`
+5. `esphome run guition-va.yaml` (first time over USB).
 
 ## Repository layout
 
 ```
-guition-va.yaml            # YOUR config: copy + edit this (pulls everything else from GitHub)
-partitions.csv             # 16 MB partition table (keep next to guition-va.yaml)
-secrets.example.yaml       # copy to secrets.yaml
-base/                      # pulled as a remote package at compile time (no need to copy)
-  core.yaml                # always-on core: clock, controls (swipe-up tiles), settings menu
-  screens/                 # optional carousel screens (toggle each in guition-va.yaml)
-    player.yaml            #   music player (album art + transport)
-    timer.yaml             #   timer screen in the carousel
-    cool-cars.yaml         #   "Cool Cars" game
-    space-wars.yaml        #   "Space Wars" game
-    snake.yaml             #   "Snake 360" game (knob steers)
-    weather.yaml           #   weather (today + 7-day radial dial)
-    thermostat.yaml        #   thermostat (climate.* dial; knob sets target, tap on/off)
-    sensors.yaml           #   sensors glance (1-6 HA entities, knob cycles)
-    demo.yaml              #   commented example screen
-    weather.ha-helper.yaml #   HA template sensor that feeds the weather screen
-assets/                    # fetched from GitHub at compile time (no need to copy locally)
-  header.jpg               # banner
-  sounds/                  # wake.wav + alarm.wav
-  sprites/cool-cars/       # "Cool Cars" game graphics
-  sprites/space-wars/      # "Space Wars" game graphics
-  sprites/snake/           # "Snake" menu logo
-scripts/
-  make_sounds.py           # (re)generate the wav sounds
-  esplog.py                # stream device logs over the native API
-skill/                     # Claude Code skill: hardware spec + gotchas
+guition-va.yaml          # thin config (entities + package list)
+partitions.csv           # 16 MB dual-slot (local path required)
+secrets.yaml             # Wi‑Fi (not committed)
+base/core.yaml           # K518 hardware + VA + LVGL core
+base/screens/*.yaml      # optional carousel screens
+assets/sounds/           # wake.wav, alarm.wav
 ```
 
-## Claude Code skill
+## GitHub packages
 
-This repo ships a [Claude Code](https://claude.com/claude-code) skill at
-[`skill/guition-jc3636k718c/`](skill/guition-jc3636k718c/SKILL.md). It gives the
-assistant the correct pinout, ESPHome component choices, and the hard-won gotchas
-(the knob isn't quadrature, GPIO0 ring strapping, 16 MB partitions need a USB flash,
-LVGL performance limits, lambda/string pitfalls, the battery heuristic).
+Set in `guition-va.yaml`:
 
-### Install it
+```yaml
+substitutions:
+  github_user: "your-github-login"
+  github_repo: "esphome-guition-jc3636k518c-va"
+  github_ref: main
 
-So Claude can use it on any project:
+packages:
+  core:
+    url: https://github.com/${github_user}/${github_repo}
+    ref: ${github_ref}
+    files:
+      - base/core.yaml
+      # ...
+```
 
-- **User-wide** - copy the folder into `~/.claude/skills/`:
-  ```bash
-  cp -r skill/guition-jc3636k718c ~/.claude/skills/
-  ```
-- **Per-project** - copy it into that project's `.claude/skills/`.
+After pushing this repo, copy only `guition-va.yaml`, `partitions.csv`, and `secrets.yaml`
+to a working directory and run `esphome run guition-va.yaml`.
 
-Start a new Claude Code session and ask anything about this board; the skill loads
-automatically. See the [wiki](https://github.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/wiki/Claude-Code-Skill) for details.
+## Credits
 
-## Credits / notes
-
-- Pinout and the display `init_sequence` come from the **official manufacturer demo**
-  (`JC3636K718_knob_EN`) - this is the correct pinout for the **K718C** board, which
-  differs from the otherwise-similar **JC3636W518**.
-- Built with [ESPHome](https://esphome.io/) + Home Assistant.
+- Original VA firmware architecture: Michal Zaniewicz (JC3636K718C).
+- K518 pinout / init sequence: manufacturer demo `JC3636K518CN_knob_EN`, [ESPHome devices](https://devices.esphome.io/devices/ESP32S3-1.8-inch-JC3636K518C/).
+- DRV2605 component: [RAR/esphome-drv2605](https://github.com/RAR/esphome-drv2605).

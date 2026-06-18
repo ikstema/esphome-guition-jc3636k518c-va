@@ -1,17 +1,18 @@
 ###############################################################################
-# Guition JC3636K718C (1.8" 360x360 ROUND KNOB, ESP32-S3) - core config
-# Pins and init_sequence from the OFFICIAL manufacturer demo (JC3636K718_knob_EN),
-# files pincfg.h + scr_st77916.h. This is the correct pinout for THIS board
-# (different from the JC3636W518!).
+# Guition JC3636K518C (1.8" 360x360 ROUND KNOB, ESP32-S3) - core config
+# Pins and init_sequence from the OFFICIAL manufacturer demo (JC3636K518CN_knob_EN).
+# Ported from esphome-guition-jc3636k718c-va (K718C) - do NOT reuse K718 or W518 pins.
 #
-# Always-on core: display (ST77916/QSPI) + touch (CST816) + knob + audio + voice assistant +
-# LED ring + the clock home screen, control tiles and settings. Optional carousel screens
-# (player, timer, games, weather, demo) live as packages in base/screens/ - see base/screens/README.md.
+# Always-on core: display (ST77916/QSPI) + touch (CST816) + quadrature knob + audio +
+# voice assistant + DRV2605 haptic + clock home screen, controls and settings.
+# Optional carousel screens live as packages in base/screens/.
 ###############################################################################
 
 substitutions:
   name: voice-knob
   friendly_name: "Voice Knob"
+  github_user: "anton"
+  github_repo: "esphome-guition-jc3636k518c-va"
   # Clock timezone. HA does not push its zone to the device, so set yours here. Use a friendly IANA
   # name (e.g. Europe/Warsaw, America/New_York) - core maps the common ones to the POSIX form the
   # device needs (it has no IANA database). For a zone not in that table, paste its POSIX string
@@ -94,7 +95,7 @@ esphome:
             id(g_set_labels) += "Display";    id(g_set_items)[id(g_set_n)++] = 11;
             id(g_set_labels) += "\nHome";       id(g_set_items)[id(g_set_n)++] = 12;
             id(g_set_labels) += "\nWidgets";    id(g_set_items)[id(g_set_n)++] = 17;
-            id(g_set_labels) += "\nRing";      id(g_set_items)[id(g_set_n)++] = 16;
+            id(g_set_labels) += "\nHaptic";   id(g_set_items)[id(g_set_n)++] = 16;
             id(g_set_labels) += "\nAssistant"; id(g_set_items)[id(g_set_n)++] = 13;
     - priority: 760
       then:
@@ -171,7 +172,9 @@ esphome:
               - lambda: 'id(g_factory_reset) = false;'
     - priority: -100
       then:
-        - light.turn_on: { id: ring_light, effect: "Rainbow", brightness: 55% }   # boot splash: spin the ring while "HELLO!" shows (turned off when the splash ends)
+        - drv2605.play_sequence:
+            id: haptic_driver
+            effects: [7, 0, 10, 0, 52]
         - lambda: |-
             // The device has no IANA tz database, so the clock needs a POSIX TZ string. To keep the
             // `timezone` substitution friendly, map common IANA names -> POSIX here and force the
@@ -259,6 +262,10 @@ psram:
   mode: octal
   speed: 80MHz
 
+external_components:
+  - source: github://RAR/esphome-drv2605
+    components: [drv2605]
+
 logger:
   level: INFO   # less logging = less overhead (DEBUG was very noisy, esp. during VA)
 
@@ -291,30 +298,31 @@ time:
     timezone: "${timezone}"
 
 ###############################################################################
-# AUDIO - DAC PCM5100A (out) + microphone + voice assistant (HA Assist)
-# DAC:  BCK=3  WS=45  DO=42   (no MCK)   MUTE=46 (LOW=mute -> we hold HIGH)
-# MIC:  data(SD)=4  clk(SCK)=5  -> configured as PDM
+# AUDIO - DAC PCM5100A (3.5 mm jack, no built-in speaker) + I2S mic + voice assistant
+# DAC:  BCK=18  WS=16  DO=17   MUTE=48 (LOW=mute -> hold HIGH)
+# MIC:  data=46  WS=45  BCK=42  (digital I2S, not PDM)
 ###############################################################################
 switch:
   - platform: gpio
-    pin: GPIO46
+    pin: GPIO48
     name: "DAC unmute"
     id: dac_unmute
-    restore_mode: ALWAYS_ON   # HIGH = not muted
+    restore_mode: ALWAYS_ON
 
 i2s_audio:
-  - id: i2s_out            # DAC PCM5100A
-    i2s_bclk_pin: GPIO3
+  - id: i2s_out
+    i2s_bclk_pin: GPIO18
+    i2s_lrclk_pin: GPIO16
+  - id: i2s_in
     i2s_lrclk_pin: GPIO45
-  - id: i2s_in             # PDM microphone: clock=GPIO5
-    i2s_lrclk_pin: GPIO5
+    i2s_bclk_pin: GPIO42
 
 speaker:
   # Raw I2S output to the DAC
   - platform: i2s_audio
     id: i2s_speaker_raw
     i2s_audio_id: i2s_out
-    i2s_dout_pin: GPIO42
+    i2s_dout_pin: GPIO17
     dac_type: external
     channel: stereo
   # Mixer: combines the music channel and the announcement (TTS) channel on one speaker
@@ -343,19 +351,19 @@ media_player:
       speaker: media_resampling_speaker
     files:
       - id: wake_sound
-        file: https://raw.githubusercontent.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/main/assets/sounds/wake.wav   # beep after the wake word
+        file: https://raw.githubusercontent.com/${github_user}/${github_repo}/main/assets/sounds/wake.wav
       - id: alarm_sound
-        file: https://raw.githubusercontent.com/MichalZaniewicz/esphome-guition-jc3636k718c-va/main/assets/sounds/alarm.wav  # timer alarm (generated with make_sounds.py)
+        file: https://raw.githubusercontent.com/${github_user}/${github_repo}/main/assets/sounds/alarm.wav
 
 microphone:
   - platform: i2s_audio
     id: i2s_microphone
     i2s_audio_id: i2s_in
-    i2s_din_pin: GPIO4
+    i2s_din_pin: GPIO46
     adc_type: external
-    pdm: true
+    pdm: false
     sample_rate: 16000
-    bits_per_sample: 16bit
+    bits_per_sample: 32bit
 
 voice_assistant:
   id: va
@@ -380,17 +388,17 @@ voice_assistant:
         duration: 0.2s
     - lvgl.label.update: { id: va_text, text: "Listening..." }
     - script.execute: va_show
-    - script.execute: ring_update
+    - script.execute: haptic_update
   on_stt_end:
     - lambda: 'id(g_va_phase) = 2;'
     - lvgl.label.update: { id: va_text, text: "Thinking..." }
-    - script.execute: ring_update
+    - script.execute: haptic_update
   on_tts_start:
     - lambda: |-
         id(g_tts_played) = true;
         id(g_va_phase) = 3;
     - lvgl.label.update: { id: va_text, text: "Speaking..." }
-    - script.execute: ring_update
+    - script.execute: haptic_update
   # TTS actually stopped -> clear the flag, hide the overlay, restore music volume
   on_tts_stream_end:
     - lambda: 'id(g_va_active) = false;'
@@ -399,7 +407,7 @@ voice_assistant:
         id: media_mixing_input
         decibel_reduction: 0
         duration: 0.5s
-    - script.execute: ring_update
+    - script.execute: haptic_update
   on_end:
     # Cleanup only when there was NO TTS (command without a response); otherwise on_tts_stream_end handles it
     - if:
@@ -413,7 +421,7 @@ voice_assistant:
               decibel_reduction: 0
               duration: 0.3s
     - micro_wake_word.start:        # resume listening for the wake word
-    - script.execute: ring_update
+    - script.execute: haptic_update
   on_error:
     - lambda: 'id(g_va_active) = false;'
     - script.execute: va_hide
@@ -422,7 +430,7 @@ voice_assistant:
         decibel_reduction: 0
         duration: 0.3s
     - micro_wake_word.start:
-    - script.execute: ring_update
+    - script.execute: haptic_update
   # --- Timers set by VOICE (HA counts down, the puck shows the same screen as the knob timer) ---
   on_timer_started:
     - lambda: |-
@@ -469,36 +477,10 @@ micro_wake_word:
               media_file: wake_sound
               announcement: true
     - voice_assistant.start:
-    - script.execute: ring_update
+    - script.execute: haptic_update
 
-# Knob - volume handling is in the `binary_sensor` section (two directional pulses).
-# ──────────────────────────────────────────────────────────────────────────
-# We DON'T USE rotary_encoder: diagnostics (esplog.py logs) showed this knob
-# does NOT produce interleaved A/B quadrature - direction is encoded by WHICH pin pulses
-# (left=GPIO2, right=GPIO1). That's why the PCNT-based rotary_encoder counted zero.
-# The block below is kept as reference (in case a real
-# quadrature encoder ever shows up). See binary_sensor: knob_left / knob_right.
-# ──────────────────────────────────────────────────────────────────────────
-# sensor:
-#   - platform: rotary_encoder
-#     name: "Knob"
-#     id: knob
-#     pin_a:
-#       number: GPIO2
-#       mode:
-#         input: true
-#         pullup: true
-#     pin_b:
-#       number: GPIO1
-#       mode:
-#         input: true
-#         pullup: true
-#     on_clockwise:
-#       - media_player.volume_up:
-#           id: media_player_speaker
-#     on_anticlockwise:
-#       - media_player.volume_down:
-#           id: media_player_speaker
+# Knob - K518 uses quadrature encoder on GPIO8 (A) / GPIO7 (B). See sensor: rotary_encoder
+# and scripts knob_cw / knob_ccw (same routing as the old K718 pulse handlers).
 
 # Variables for swipe gestures: dx/dy relative to touch start (x_org/y_org)
 globals:
@@ -674,53 +656,33 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'true'
-  # --- LED ring (WS2812): reaction state + snapshot of HA state to restore ---
-  - id: g_ring_cur     # currently shown reaction: 0=HA state 1=alarm 2=assistant 3=timer
+  # --- Haptic (DRV2605): reaction state (g_ring_* ids kept for minimal diff) ---
+  - id: g_ring_cur     # 0=idle 1=alarm 3=timer 5=volume 21/22/23=VA phases
     type: int
     restore_value: no
     initial_value: '0'
-  - id: g_ring_override  # true = ring overridden by a reaction (HA-state snapshot already taken)
-    type: bool
+  - id: g_haptic_tick  # throttle sustained haptic pulses
+    type: uint32_t
     restore_value: no
-    initial_value: 'false'
-  - id: g_ring_was_on  # snapshot: was the ring on in HA before the reaction
-    type: bool
-    restore_value: no
-    initial_value: 'false'
-  - id: g_ring_r       # snapshot of HA color/brightness (0..1)
-    type: float
-    restore_value: no
-    initial_value: '1.0'
-  - id: g_ring_g
-    type: float
-    restore_value: no
-    initial_value: '1.0'
-  - id: g_ring_b
-    type: float
-    restore_value: no
-    initial_value: '1.0'
-  - id: g_ring_bri
-    type: float
-    restore_value: no
-    initial_value: '1.0'
-  - id: g_va_phase    # assistant phase for the ring: 1=listening 2=thinking 3=speaking
+    initial_value: '0'
+  - id: g_va_phase    # assistant phase: 1=listening 2=thinking 3=speaking
     type: int
     restore_value: no
     initial_value: '0'
-  - id: g_vol         # last volume from HA (0..1) - for the ring volume bar
+  - id: g_vol         # last volume from HA (0..1)
     type: float
     restore_value: no
     initial_value: '0.0'
-  - id: g_vol_show    # true = show volume on the ring (briefly, ~2 s after turning)
+  - id: g_vol_show    # true = haptic volume bump (~2 s after turning)
     type: bool
     restore_value: no
     initial_value: 'false'
-  # --- Ring: which reactions are enabled (persistent; editable in Settings -> Ring) ---
+  # --- Haptic: which reactions are enabled (Settings -> Haptic) ---
   - id: g_ring_va      # react to the assistant (listening/thinking/speaking)
     type: bool
     restore_value: yes
     initial_value: 'true'
-  - id: g_ring_timer   # show the timer countdown ring
+  - id: g_ring_timer   # timer countdown haptic
     type: bool
     restore_value: yes
     initial_value: 'true'
@@ -728,7 +690,7 @@ globals:
     type: bool
     restore_value: yes
     initial_value: 'true'
-  - id: g_ring_vol_en  # show the volume bar while turning
+  - id: g_ring_vol_en  # haptic bump while turning volume
     type: bool
     restore_value: yes
     initial_value: 'true'
@@ -1065,7 +1027,7 @@ script:
                 condition: { lambda: 'return id(g_mode) == 15;' }
                 then: [ lvgl.widget.show: sys_roller, lvgl.roller.update: { id: sys_roller, animated: true, selected_index: !lambda 'return id(g_sub_idx);' } ]
                 else: [ lvgl.widget.hide: sys_roller ]
-            - if:   # Ring (16): reaction roller + toggle for the selected one
+            - if:   # Haptic (16): reaction roller + toggle for the selected one
                 condition: { lambda: 'return id(g_mode) == 16;' }
                 then:
                   - lvgl.widget.show: ring_roller
@@ -1165,65 +1127,170 @@ script:
           id: media_player_speaker
           media_file: alarm_sound
           announcement: true
-      - script.execute: ring_update
+      - script.execute: haptic_update
   - id: alarm_stop
     then:
       - lambda: 'id(g_mode) = 0; id(g_timer_active) = false; id(g_timer_paused) = false; id(g_timer_secs) = 0;'
       - script.execute: ui_render
       - script.execute: timer_render
-  # LED ring: chooses what to show by priority (alarm > assistant > volume > timer > HA state).
-  # On first entry into a reaction it saves the HA state (on/off+color+brightness);
-  # once all reactions clear, it restores it. Effects refresh themselves (update_interval).
-  - id: ring_update
+  # Knob CCW (anticlockwise) - same routing as the old K718 pulse-left handler.
+  - id: knob_ccw
+    then:
+      - if:
+          condition:
+            lambda: 'return id(g_mode) == 0 && (id(g_knob_capture) || (id(g_base) == 2 && !id(g_timer_active)));'
+          then:
+            - if:
+                condition: { lambda: 'return id(g_knob_capture);' }
+                then: [ lambda: 'id(g_knob_delta)--;' ]
+                else:
+                  - lambda: 'id(g_set_min)--; if (id(g_set_min) < 1) id(g_set_min) = 1;'
+                  - script.execute: timer_render
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(g_mode) == 5 || id(g_mode) == 11 || (id(g_mode) >= 12 && id(g_mode) <= 17) || id(g_mode) == 30;'
+                then:
+                  - lambda: |-
+                      if (id(g_mode) == 11) { if (id(g_disp_idx) > 0) id(g_disp_idx)--; }
+                      else if (id(g_mode) == 5) { if (id(g_set_idx) > 0) id(g_set_idx)--; }
+                      else if (id(g_mode) == 17) { if (id(g_wgrp_idx) > 0) id(g_wgrp_idx)--; }
+                      else if (id(g_mode) == 30) { if (id(g_wopt_idx) > 0) id(g_wopt_idx)--; }
+                      else { if (id(g_sub_idx) > 0) id(g_sub_idx)--; }
+                  - script.execute: ui_render
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(g_mode) == 6;'
+                      then:
+                        - lambda: 'id(g_bright) -= 10; if (id(g_bright) < 10) id(g_bright) = 10;'
+                        - light.turn_on:
+                            id: backlight_light
+                            brightness: !lambda 'return id(g_bright) / 100.0f;'
+                        - script.execute: ui_render
+                      else:
+                        - if:
+                            condition: { lambda: 'return id(g_mode) == 24 || id(g_mode) == 25 || id(g_mode) == 26;' }
+                            then:
+                              - lambda: |-
+                                  if (id(g_mode) == 24) { if (id(g_blank_idx) > 0) id(g_blank_idx)--; }
+                                  else if (id(g_mode) == 25) { id(g_night_from)--; if (id(g_night_from) < 0) id(g_night_from) = 23; }
+                                  else { id(g_night_to)--; if (id(g_night_to) < 0) id(g_night_to) = 23; }
+                              - script.execute: ui_render
+                            else:
+                              - media_player.volume_down:
+                                  id: media_player_speaker
+                              - script.execute: flash_volume
+                              - script.execute: haptic_vol_flash
+  - id: knob_cw
+    then:
+      - if:
+          condition:
+            lambda: 'return id(g_mode) == 0 && (id(g_knob_capture) || (id(g_base) == 2 && !id(g_timer_active)));'
+          then:
+            - if:
+                condition: { lambda: 'return id(g_knob_capture);' }
+                then: [ lambda: 'id(g_knob_delta)++;' ]
+                else:
+                  - lambda: 'id(g_set_min)++; if (id(g_set_min) > 180) id(g_set_min) = 180;'
+                  - script.execute: timer_render
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(g_mode) == 5 || id(g_mode) == 11 || (id(g_mode) >= 12 && id(g_mode) <= 17) || id(g_mode) == 30;'
+                then:
+                  - lambda: |-
+                      if (id(g_mode) == 11) { if (id(g_disp_idx) < 4) id(g_disp_idx)++; }
+                      else if (id(g_mode) == 5) { if (id(g_set_idx) < id(g_set_n) - 1) id(g_set_idx)++; }
+                      else if (id(g_mode) == 17) { if (id(g_wgrp_idx) < id(g_wgrp_n) - 1) id(g_wgrp_idx)++; }
+                      else if (id(g_mode) == 30) { if (id(g_wopt_idx) < id(g_wcur_n) - 1) id(g_wopt_idx)++; }
+                      else { int mx = (id(g_mode) == 15) ? 3 : (id(g_mode) == 13) ? 2 : (id(g_mode) == 16) ? 3 : (id(g_mode) == 12) ? 1 : 0; if (id(g_sub_idx) < mx) id(g_sub_idx)++; }
+                  - script.execute: ui_render
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(g_mode) == 6;'
+                      then:
+                        - lambda: 'id(g_bright) += 10; if (id(g_bright) > 100) id(g_bright) = 100;'
+                        - light.turn_on:
+                            id: backlight_light
+                            brightness: !lambda 'return id(g_bright) / 100.0f;'
+                        - script.execute: ui_render
+                      else:
+                        - if:
+                            condition: { lambda: 'return id(g_mode) == 24 || id(g_mode) == 25 || id(g_mode) == 26;' }
+                            then:
+                              - lambda: |-
+                                  if (id(g_mode) == 24) { if (id(g_blank_idx) < 4) id(g_blank_idx)++; }
+                                  else if (id(g_mode) == 25) { id(g_night_from)++; if (id(g_night_from) > 23) id(g_night_from) = 0; }
+                                  else { id(g_night_to)++; if (id(g_night_to) > 23) id(g_night_to) = 0; }
+                              - script.execute: ui_render
+                            else:
+                              - media_player.volume_up:
+                                  id: media_player_speaker
+                              - script.execute: flash_volume
+                              - script.execute: haptic_vol_flash
+  # Haptic: priority alarm > assistant > volume > timer > idle.
+  - id: haptic_update
     then:
       - lambda: |-
           int desired;
-          if (id(g_mode) == 4 && id(g_ring_alarm)) desired = 1;                     // alarm
-          else if (id(g_va_active) && id(g_ring_va)) desired = 20 + id(g_va_phase); // 21=listening 22=thinking 23=speaking
-          else if (id(g_vol_show) && id(g_ring_vol_en)) desired = 5;               // volume (briefly, ~2 s)
-          else if (id(g_timer_active) && id(g_ring_timer)) desired = 3;            // timer
-          else desired = 0;                                                        // HA state
-          if (desired == id(g_ring_cur)) return;       // no change -> do nothing (the effect animates itself)
-          if (desired != 0 && !id(g_ring_override)) {  // entering a reaction: snapshot HA state (once)
-            auto v = id(ring_light)->remote_values;
-            id(g_ring_was_on) = v.is_on();
-            id(g_ring_r) = v.get_red();
-            id(g_ring_g) = v.get_green();
-            id(g_ring_b) = v.get_blue();
-            id(g_ring_bri) = v.get_brightness();
-            id(g_ring_override) = true;
-          }
-          const char *eff = nullptr;
-          if (desired == 1)       eff = "Alarm";
-          else if (desired == 21) eff = "Listen";
-          else if (desired == 22) eff = "Think";
-          else if (desired == 23) eff = "Speak";
-          else if (desired == 5)  eff = "Volume";
-          else if (desired == 3)  eff = "Timer";
-          if (eff != nullptr) {
-            auto c = id(ring_light)->turn_on(); c.set_effect(eff); c.set_brightness(1.0f); c.perform();
-          } else {                                     // all reactions cleared -> restore HA state
-            id(g_ring_override) = false;
-            if (id(g_ring_was_on)) {
-              auto c = id(ring_light)->turn_on();
-              c.set_effect("None");
-              c.set_rgb(id(g_ring_r), id(g_ring_g), id(g_ring_b));
-              c.set_brightness(id(g_ring_bri));
-              c.perform();
-            } else {
-              id(ring_light)->turn_off().perform();
-            }
-          }
+          if (id(g_mode) == 4 && id(g_ring_alarm)) desired = 1;
+          else if (id(g_va_active) && id(g_ring_va)) desired = 20 + id(g_va_phase);
+          else if (id(g_vol_show) && id(g_ring_vol_en)) desired = 5;
+          else if (id(g_timer_active) && id(g_ring_timer)) desired = 3;
+          else desired = 0;
+          if (desired == id(g_ring_cur)) return;
           id(g_ring_cur) = desired;
-  # Shows volume on the ring for ~2 s while turning the knob (mode: restart), then returns to state/reaction.
-  - id: ring_vol_flash
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 0;' }
+          then:
+            - drv2605.stop:
+                id: haptic_driver
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 1;' }
+          then:
+            - drv2605.play_sequence:
+                id: haptic_driver
+                effects: [16, 0, 16, 0, 16]
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 21;' }
+          then:
+            - drv2605.play_effect:
+                id: haptic_driver
+                effect: 7
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 22;' }
+          then:
+            - drv2605.play_effect:
+                id: haptic_driver
+                effect: 10
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 23;' }
+          then:
+            - drv2605.play_effect:
+                id: haptic_driver
+                effect: 52
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 5;' }
+          then:
+            - drv2605.play_effect:
+                id: haptic_driver
+                effect: 7
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 3;' }
+          then:
+            - drv2605.play_effect:
+                id: haptic_driver
+                effect: 14
+  - id: haptic_vol_flash
     mode: restart
     then:
       - lambda: 'id(g_vol_show) = true;'
-      - script.execute: ring_update
+      - script.execute: haptic_update
       - delay: 2000ms
       - lambda: 'id(g_vol_show) = false;'
-      - script.execute: ring_update
+      - script.execute: haptic_update
   # --- Timer as a SCREEN (page_timer): render + button controls ---
   - id: timer_render
     then:
@@ -1255,7 +1322,7 @@ script:
             - lvgl.widget.show: timer_play
             - lvgl.widget.hide: timer_pause
             - lvgl.widget.hide: timer_stop
-      - script.execute: ring_update
+      - script.execute: haptic_update
   - id: timer_start
     then:
       - lambda: |-
@@ -1340,9 +1407,9 @@ sensor:
       - lvgl.label.update:
           id: lbl_ch_val
           text: !lambda 'char b[8]; snprintf(b, sizeof(b), "%d%%", (int) roundf(x)); return std::string(b);'
-  # Battery: ADC on GPIO6 (BAT_ADC, ~10k/10k divider -> x2). PIN/RATIO to verify live.
+  # Battery: ADC on GPIO1 (BAT_ADC, ~2:1 divider -> x2).
   - platform: adc
-    pin: GPIO6
+    pin: GPIO1
     id: batt_volt
     name: "Battery voltage"
     attenuation: 12db
@@ -1385,149 +1452,51 @@ sensor:
           else if (low)       id(g_charging) = false;
           // 4.05-4.13 zone without a rise: keep the previous state (hysteresis, no flicker)
       - script.execute: batt_render
-
-# Push-to-talk: screen TAP (handled in touchscreen: on_release). Swipe = next/prev.
-# Eventually the wake word (micro_wake_word) will be better.
-binary_sensor:
-  # ── KNOB: this "encoder" is NOT classic quadrature. Confirmed by logs:
-  #    direction is encoded by WHICH pin pulses (not A/B phase):
-  #      • LEFT  → GPIO2 pulses  → quieter
-  #      • RIGHT → GPIO1 pulses  → louder
-  #    Each detent = one clean LOW pulse (sequence 0101...), zero bounce.
-  #    That's why rotary_encoder (expects interleaved A/B) counted zero.
-  #    So we read two independent pulses: inverted+pullup → detent = "on_press".
-  - platform: gpio
-    name: "Knob left"
-    id: knob_left
-    pin:
-      number: GPIO2
-      inverted: true
+  - platform: rotary_encoder
+    name: "Knob"
+    id: knob
+    pin_a:
+      number: GPIO8
       mode:
         input: true
         pullup: true
-    on_press:
-      - if:
-          condition:
-            lambda: 'return id(g_mode) == 0 && (id(g_knob_capture) || (id(g_base) == 2 && !id(g_timer_active)));'
-          then:
-            - if:
-                condition: { lambda: 'return id(g_knob_capture);' }
-                then: [ lambda: 'id(g_knob_delta)--;' ]
-                else:
-                  - lambda: 'id(g_set_min)--; if (id(g_set_min) < 1) id(g_set_min) = 1;'
-                  - script.execute: timer_render
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(g_mode) == 5 || id(g_mode) == 11 || (id(g_mode) >= 12 && id(g_mode) <= 17) || id(g_mode) == 30;'
-                then:
-                  - lambda: |-
-                      if (id(g_mode) == 11) { if (id(g_disp_idx) > 0) id(g_disp_idx)--; }
-                      else if (id(g_mode) == 5) { if (id(g_set_idx) > 0) id(g_set_idx)--; }
-                      else if (id(g_mode) == 17) { if (id(g_wgrp_idx) > 0) id(g_wgrp_idx)--; }
-                      else if (id(g_mode) == 30) { if (id(g_wopt_idx) > 0) id(g_wopt_idx)--; }
-                      else { if (id(g_sub_idx) > 0) id(g_sub_idx)--; }
-                  - script.execute: ui_render
-                else:
-                  - if:
-                      condition:
-                        lambda: 'return id(g_mode) == 6;'
-                      then:
-                        - lambda: 'id(g_bright) -= 10; if (id(g_bright) < 10) id(g_bright) = 10;'
-                        - light.turn_on:
-                            id: backlight_light
-                            brightness: !lambda 'return id(g_bright) / 100.0f;'
-                        - script.execute: ui_render
-                      else:
-                        - if:
-                            condition: { lambda: 'return id(g_mode) == 24 || id(g_mode) == 25 || id(g_mode) == 26;' }
-                            then:
-                              - lambda: |-
-                                  if (id(g_mode) == 24) { if (id(g_blank_idx) > 0) id(g_blank_idx)--; }
-                                  else if (id(g_mode) == 25) { id(g_night_from)--; if (id(g_night_from) < 0) id(g_night_from) = 23; }
-                                  else { id(g_night_to)--; if (id(g_night_to) < 0) id(g_night_to) = 23; }
-                              - script.execute: ui_render
-                            else:
-                              - media_player.volume_down:
-                                  id: media_player_speaker
-                              - script.execute: flash_volume
-                              - script.execute: ring_vol_flash
-  - platform: gpio
-    name: "Knob right"
-    id: knob_right
-    pin:
-      number: GPIO1
-      inverted: true
+    pin_b:
+      number: GPIO7
       mode:
         input: true
         pullup: true
-    on_press:
-      - if:
-          condition:
-            lambda: 'return id(g_mode) == 0 && (id(g_knob_capture) || (id(g_base) == 2 && !id(g_timer_active)));'
-          then:
-            - if:
-                condition: { lambda: 'return id(g_knob_capture);' }
-                then: [ lambda: 'id(g_knob_delta)++;' ]
-                else:
-                  - lambda: 'id(g_set_min)++; if (id(g_set_min) > 180) id(g_set_min) = 180;'
-                  - script.execute: timer_render
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(g_mode) == 5 || id(g_mode) == 11 || (id(g_mode) >= 12 && id(g_mode) <= 17) || id(g_mode) == 30;'
-                then:
-                  - lambda: |-
-                      if (id(g_mode) == 11) { if (id(g_disp_idx) < 4) id(g_disp_idx)++; }
-                      else if (id(g_mode) == 5) { if (id(g_set_idx) < id(g_set_n) - 1) id(g_set_idx)++; }
-                      else if (id(g_mode) == 17) { if (id(g_wgrp_idx) < id(g_wgrp_n) - 1) id(g_wgrp_idx)++; }
-                      else if (id(g_mode) == 30) { if (id(g_wopt_idx) < id(g_wcur_n) - 1) id(g_wopt_idx)++; }
-                      else { int mx = (id(g_mode) == 15) ? 3 : (id(g_mode) == 13) ? 2 : (id(g_mode) == 16) ? 3 : (id(g_mode) == 12) ? 1 : 0; if (id(g_sub_idx) < mx) id(g_sub_idx)++; }
-                  - script.execute: ui_render
-                else:
-                  - if:
-                      condition:
-                        lambda: 'return id(g_mode) == 6;'
-                      then:
-                        - lambda: 'id(g_bright) += 10; if (id(g_bright) > 100) id(g_bright) = 100;'
-                        - light.turn_on:
-                            id: backlight_light
-                            brightness: !lambda 'return id(g_bright) / 100.0f;'
-                        - script.execute: ui_render
-                      else:
-                        - if:
-                            condition: { lambda: 'return id(g_mode) == 24 || id(g_mode) == 25 || id(g_mode) == 26;' }
-                            then:
-                              - lambda: |-
-                                  if (id(g_mode) == 24) { if (id(g_blank_idx) < 4) id(g_blank_idx)++; }
-                                  else if (id(g_mode) == 25) { id(g_night_from)++; if (id(g_night_from) > 23) id(g_night_from) = 0; }
-                                  else { id(g_night_to)++; if (id(g_night_to) > 23) id(g_night_to) = 0; }
-                              - script.execute: ui_render
-                            else:
-                              - media_player.volume_up:
-                                  id: media_player_speaker
-                              - script.execute: flash_volume
-                              - script.execute: ring_vol_flash
+    resolution: 2
+    on_clockwise:
+      - script.execute: knob_cw
+    on_anticlockwise:
+      - script.execute: knob_ccw
 
 ###############################################################################
-# DISPLAY (QSPI ST77916) + BACKLIGHT + TOUCH (CST816)
-# Pins: SCK=11 CS=12 D0=13 D1=14 D2=15 D3=16 RST=17 BLK=21
-#       TOUCH SDA=9 SCL=10 INT=7 RST=8
+# DISPLAY (QSPI ST77916) + BACKLIGHT + TOUCH (CST816) + HAPTIC (DRV2605)
+# Pins: SCK=13 CS=14 D0=15-18 RST=21 BLK=47
+#       TOUCH SDA=11 SCL=12 INT=9 RST=10   KNOB A=8 B=7
 ###############################################################################
 spi:
   id: display_qspi
   type: quad
-  clk_pin: 11
-  data_pins: [13, 14, 15, 16]
+  clk_pin: 13
+  data_pins: [15, 16, 17, 18]
 
 i2c:
-  sda: 9
-  scl: 10
+  sda: 11
+  scl: 12
   id: touchscreen_bus
+
+drv2605:
+  id: haptic_driver
+  i2c_id: touchscreen_bus
+  address: 0x5A
+  motor_type: LRA
+  library: 6
 
 output:
   - platform: ledc
-    pin: GPIO21
+    pin: GPIO47
     id: backlight_output
 
 light:
@@ -1536,96 +1505,6 @@ light:
     name: "Backlight"
     id: backlight_light
     restore_mode: ALWAYS_ON
-  # LED ring on the knob: WS2812, 13 LEDs, GRB, data=GPIO0.
-  # GPIO0 is also the BOOT/strapping pin - it works as a WS2812 output after boot
-  # (ESPHome may warn about a strapping pin; that's normal on this board).
-  # Controllable from HA (on/off, color, brightness, effects). Reactions (assistant/timer/alarm)
-  # temporarily override the ring by priority and return to the HA state - see the ring_update script.
-  - platform: esp32_rmt_led_strip
-    id: ring_light
-    name: "${friendly_name} Ring"
-    pin: GPIO0
-    num_leds: 13
-    rgb_order: GRB
-    chipset: WS2812
-    rmt_symbols: 64
-    default_transition_length: 0s     # no fade - reactions should be instant
-    restore_mode: RESTORE_DEFAULT_OFF
-    effects:
-      - addressable_rainbow:
-          name: "Rainbow"
-      - pulse:
-          name: "Pulse"
-      # --- Reaction effects (driven by ring_update, read state globals) ---
-      - addressable_lambda:    # Assistant LISTENING: a comet (cyan) circles the ring
-          name: "Listen"
-          update_interval: 50ms
-          lambda: |-
-            int n = it.size();
-            float pos = fmodf(millis() / 60.0f, (float) n);
-            for (int i = 0; i < n; i++) {
-              float d = fabsf(i - pos);
-              if (d > n / 2.0f) d = n - d;          // distance around the circle
-              float b = (d < 4.0f) ? (1.0f - d / 4.0f) : 0.0f;
-              it[i] = Color(0, (uint8_t)(210 * b), (uint8_t)(230 * b));
-            }
-      - addressable_lambda:    # Assistant THINKING: fast spinner (purple, 3 LEDs)
-          name: "Think"
-          update_interval: 45ms
-          lambda: |-
-            int n = it.size();
-            int head = (int)(millis() / 45) % n;
-            for (int i = 0; i < n; i++) it[i] = Color(0, 0, 0);
-            for (int k = 0; k < 3; k++) {
-              int idx = (head + k) % n;
-              float b = 1.0f - k * 0.33f;
-              it[idx] = Color((uint8_t)(150 * b), (uint8_t)(40 * b), (uint8_t)(230 * b));
-            }
-      - addressable_lambda:    # Assistant SPEAKING: smooth wave (teal-green) running around
-          name: "Speak"
-          update_interval: 50ms
-          lambda: |-
-            int n = it.size();
-            float t = millis() / 120.0f;
-            for (int i = 0; i < n; i++) {
-              float w = 0.5f + 0.5f * sinf((float) i / n * 6.2831853f * 2.0f - t);
-              it[i] = Color((uint8_t)(20 * w), (uint8_t)(220 * w), (uint8_t)(120 * w));
-            }
-      - addressable_lambda:    # Volume: level bar (green->red) for ~2 s while turning
-          name: "Volume"
-          update_interval: 60ms
-          lambda: |-
-            int n = it.size();
-            float v = id(g_vol);
-            if (v < 0) v = 0;
-            if (v > 1) v = 1;
-            int lit = (int) roundf(v * n);
-            for (int i = 0; i < n; i++) {
-              if (i < lit) it[i] = Color((uint8_t)(40 + 215 * v), (uint8_t)(200 * (1.0f - v)), 0);
-              else it[i] = Color(6, 6, 6);
-            }
-      - addressable_lambda:    # Alarm: pulsing red
-          name: "Alarm"
-          update_interval: 280ms
-          lambda: |-
-            static bool on = false;
-            on = !on;
-            it.all() = on ? Color(255, 0, 0) : Color(20, 0, 0);
-      - addressable_lambda:    # Timer: countdown ring (green -> red, shrinks over time)
-          name: "Timer"
-          update_interval: 200ms
-          lambda: |-
-            int n = it.size();
-            int tot = id(g_timer_total);
-            float frac = (tot > 0) ? (float) id(g_timer_secs) / tot : 0.0f;
-            if (frac < 0) frac = 0;
-            if (frac > 1) frac = 1;
-            int lit = (int) ceilf(frac * n);
-            // red from the start (like the on-screen timer ring); pause = dimmed
-            uint8_t dim = id(g_timer_paused) ? 3 : 1;
-            for (int i = 0; i < n; i++) {
-              it[i] = (i < lit) ? Color(255 / dim, 59 / dim, 48 / dim) : Color(0, 0, 0);
-            }
 
 button:
   - platform: restart
@@ -1635,8 +1514,8 @@ button:
 touchscreen:
   platform: cst816
   id: my_touchscreen
-  interrupt_pin: GPIO7
-  reset_pin: GPIO8
+  interrupt_pin: GPIO9
+  reset_pin: GPIO10
   display: main_display
   on_touch:
     - lambda: |-
@@ -1916,10 +1795,10 @@ touchscreen:
           - if:
               condition: { lambda: 'return id(g_gesture) == 0;' }
               then:
-                - if: { condition: { lambda: 'return id(g_sub_idx) == 0;' }, then: [ lambda: 'id(g_ring_va) = !id(g_ring_va);', script.execute: ring_update, script.execute: ui_render ] }
-                - if: { condition: { lambda: 'return id(g_sub_idx) == 1;' }, then: [ lambda: 'id(g_ring_timer) = !id(g_ring_timer);', script.execute: ring_update, script.execute: ui_render ] }
-                - if: { condition: { lambda: 'return id(g_sub_idx) == 2;' }, then: [ lambda: 'id(g_ring_alarm) = !id(g_ring_alarm);', script.execute: ring_update, script.execute: ui_render ] }
-                - if: { condition: { lambda: 'return id(g_sub_idx) == 3;' }, then: [ lambda: 'id(g_ring_vol_en) = !id(g_ring_vol_en);', script.execute: ring_update, script.execute: ui_render ] }
+                - if: { condition: { lambda: 'return id(g_sub_idx) == 0;' }, then: [ lambda: 'id(g_ring_va) = !id(g_ring_va);', script.execute: haptic_update, script.execute: ui_render ] }
+                - if: { condition: { lambda: 'return id(g_sub_idx) == 1;' }, then: [ lambda: 'id(g_ring_timer) = !id(g_ring_timer);', script.execute: haptic_update, script.execute: ui_render ] }
+                - if: { condition: { lambda: 'return id(g_sub_idx) == 2;' }, then: [ lambda: 'id(g_ring_alarm) = !id(g_ring_alarm);', script.execute: haptic_update, script.execute: ui_render ] }
+                - if: { condition: { lambda: 'return id(g_sub_idx) == 3;' }, then: [ lambda: 'id(g_ring_vol_en) = !id(g_ring_vol_en);', script.execute: haptic_update, script.execute: ui_render ] }
           - if: { condition: { lambda: 'return id(g_gesture) == 3 || id(g_gesture) == 1;' }, then: [ lambda: 'id(g_mode) = 5;', script.execute: ui_render ] }
     # === RESTART confirm (9) === tap = YES (restart); right/hold = NO
     - if:
@@ -1995,8 +1874,8 @@ display:
     dimensions:
       height: 360
       width: 360
-    cs_pin: 12
-    reset_pin: GPIO17
+    cs_pin: 14
+    reset_pin: GPIO21
     # show_test_card: true   # (disabled - LVGL draws now)
     init_sequence:
       - [ 0xF0, 0x28 ]
@@ -2180,7 +2059,53 @@ display:
       - [ 0xD9, 0xAA ]
       - [ 0xF3, 0x01 ]
       - [ 0xF0, 0x00 ]
-      - [ 0x3A, 0x55 ]   # 16-bit/RGB565 (added for ESPHome)
+      - [ 0xF0, 0x01 ]
+      - [ 0xF1, 0x01 ]
+      - [ 0xA0, 0x0B ]
+      - [ 0xA3, 0x2A ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x2B ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x2C ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x2D ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x2E ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x2F ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x30 ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x31 ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x32 ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA3, 0x33 ]
+      - [ 0xA5, 0xC3 ]
+      - delay 1ms
+      - [ 0xA0, 0x09 ]
+      - [ 0xF1, 0x10 ]
+      - [ 0xF0, 0x00 ]
+      - [ 0x2A, 0x00, 0x00, 0x01, 0x67 ]
+      - [ 0x2B, 0x01, 0x68, 0x01, 0x68 ]
+      - [ 0x4D, 0x00 ]
+      - [ 0x4E, 0x00 ]
+      - [ 0x4F, 0x00 ]
+      - [ 0x4C, 0x01 ]
+      - delay 10ms
+      - [ 0x4C, 0x00 ]
+      - [ 0x2A, 0x00, 0x00, 0x01, 0x67 ]
+      - [ 0x2B, 0x00, 0x00, 0x01, 0x67 ]
+      - [ 0x3A, 0x55 ]
       - [ 0x21, 0x00 ]
       - [ 0x11, 0x00 ]
       - delay 120ms
@@ -2305,6 +2230,30 @@ text_sensor:
 # LVGL - home page (clock + VA status) and PLAYER page (album art)
 ###############################################################################
 interval:
+  # Sustained haptic pulses for listening / timer / alarm (transition handled by haptic_update).
+  - interval: 450ms
+    then:
+      - if:
+          condition: { lambda: 'return id(g_ring_cur) == 21 || id(g_ring_cur) == 3 || id(g_ring_cur) == 1;' }
+          then:
+            - if:
+                condition: { lambda: 'return id(g_ring_cur) == 21;' }
+                then:
+                  - drv2605.play_effect:
+                      id: haptic_driver
+                      effect: 7
+            - if:
+                condition: { lambda: 'return id(g_ring_cur) == 3;' }
+                then:
+                  - drv2605.play_effect:
+                      id: haptic_driver
+                      effect: 14
+            - if:
+                condition: { lambda: 'return id(g_ring_cur) == 1;' }
+                then:
+                  - drv2605.play_effect:
+                      id: haptic_driver
+                      effect: 16
   # Boot splash: type out "HELLO!" then cross-fade to the clock (~5 s), once at startup.
   - interval: 150ms
     then:
@@ -2317,7 +2266,8 @@ interval:
                 condition: { lambda: 'return id(g_boot_t) >= 33;' }   # 33 * 150ms ~= 5 s
                 then:
                   - lambda: 'id(g_boot) = false;'
-                  - light.turn_off: ring_light                        # stop the boot ring animation
+                  - drv2605.stop:
+                      id: haptic_driver
                   - safe_mode.mark_successful:                        # commit this OTA image now so a restart won't roll back to the old firmware
                   - lvgl.page.show: { id: page_home, animation: fade_in, time: 400ms }
   - interval: 2s
