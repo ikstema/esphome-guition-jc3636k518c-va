@@ -72,6 +72,7 @@ async def to_code(config):
             cv.Required(CONF_EFFECT): cv.templatable(cv.int_range(min=1, max=123)),
         }
     ),
+    synchronous=True,
 )
 async def play_effect_to_code(config, action_id, template_arg, args):
     """Code generation for play_effect action."""
@@ -95,6 +96,7 @@ async def play_effect_to_code(config, action_id, template_arg, args):
             ),
         }
     ),
+    synchronous=True,
 )
 async def play_sequence_to_code(config, action_id, template_arg, args):
     """Code generation for play_sequence action."""
@@ -112,6 +114,7 @@ async def play_sequence_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DRV2605Component),
         }
     ),
+    synchronous=True,
 )
 async def stop_to_code(config, action_id, template_arg, args):
     """Code generation for stop action."""
@@ -129,6 +132,7 @@ async def stop_to_code(config, action_id, template_arg, args):
             cv.Required(CONF_VALUE): cv.templatable(cv.int_range(min=0, max=255)),
         }
     ),
+    synchronous=True,
 )
 async def set_realtime_value_to_code(config, action_id, template_arg, args):
     """Code generation for set_realtime_value action."""
@@ -148,6 +152,7 @@ async def set_realtime_value_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DRV2605Component),
         }
     ),
+    synchronous=True,
 )
 async def standby_to_code(config, action_id, template_arg, args):
     """Code generation for standby action (low-power mode)."""
@@ -164,6 +169,7 @@ async def standby_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DRV2605Component),
         }
     ),
+    synchronous=True,
 )
 async def wake_to_code(config, action_id, template_arg, args):
     """Code generation for wake action (exit standby mode)."""
