@@ -486,8 +486,9 @@ micro_wake_word:
     - voice_assistant.start:
     - script.execute: haptic_update
 
-# Knob - K518 uses quadrature encoder on GPIO8 (A) / GPIO7 (B). See sensor: rotary_encoder
-# and scripts knob_cw / knob_ccw (same routing as the old K718 pulse handlers).
+# Knob - K518 is NOT classic quadrature (same as K718): each detent pulses ONE pin.
+# CCW/left -> GPIO7, CW/right -> GPIO8. rotary_encoder counts zero on this hardware.
+# See binary_sensor: knob_left / knob_right -> scripts knob_ccw / knob_cw.
 
 # Variables for swipe gestures: dx/dy relative to touch start (x_org/y_org)
 globals:
@@ -1459,24 +1460,31 @@ sensor:
           else if (low)       id(g_charging) = false;
           // 4.05-4.13 zone without a rise: keep the previous state (hysteresis, no flicker)
       - script.execute: batt_render
-  - platform: rotary_encoder
-    name: "Knob"
-    id: knob
-    pin_a:
-      number: GPIO8
-      mode:
-        input: true
-        pullup: true
-    pin_b:
+
+binary_sensor:
+  # K518 knob: direction = which pin pulses (not A/B quadrature). inverted+pullup -> on_press per detent.
+  - platform: gpio
+    name: "Knob left"
+    id: knob_left
+    pin:
       number: GPIO7
+      inverted: true
       mode:
         input: true
         pullup: true
-    resolution: 2
-    on_clockwise:
-      - script.execute: knob_cw
-    on_anticlockwise:
+    on_press:
       - script.execute: knob_ccw
+  - platform: gpio
+    name: "Knob right"
+    id: knob_right
+    pin:
+      number: GPIO8
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      - script.execute: knob_cw
 
 ###############################################################################
 # DISPLAY (QSPI ST77916) + BACKLIGHT + TOUCH (CST816) + HAPTIC (DRV2605)
