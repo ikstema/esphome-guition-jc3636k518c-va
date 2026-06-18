@@ -13,6 +13,7 @@ substitutions:
   friendly_name: "Voice Knob"
   github_user: "ikstema"
   github_repo: "esphome-guition-jc3636k518c-va"
+  github_ref: "main"
   # Clock timezone. HA does not push its zone to the device, so set yours here. Use a friendly IANA
   # name (e.g. Europe/Warsaw, America/New_York) - core maps the common ones to the POSIX form the
   # device needs (it has no IANA database). For a zone not in that table, paste its POSIX string
@@ -270,12 +271,16 @@ psram:
 
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/${github_user}/${github_repo}.git
+      ref: ${github_ref}
     components: [drv2605]
 
 logger:
   level: INFO   # less logging = less overhead (DEBUG was very noisy, esp. during VA)
+  logs:
+    drv2605: INFO
+    i2c.idf: WARN
 
 api:
 
@@ -601,6 +606,10 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: g_alarm_flash  # toggled every 500ms while alarm is active (header blink)
+    type: bool
+    restore_value: no
+    initial_value: 'false'
   - id: g_bright       # screen brightness in % (settings)
     type: int
     restore_value: no
@@ -1196,29 +1205,43 @@ script:
       - lambda: 'id(g_mode) = 0; id(g_timer_local) = false; id(g_timer_secs) = 0;'
       - script.execute: ui_render
   - id: alarm_start
+    mode: single
     then:
-      - lambda: |-
-          id(g_mode) = 4;
-          id(g_alarm_cnt) = 0;
-          id(g_timer_active) = false;
-          id(g_timer_paused) = false;
-          id(g_timer_secs) = 0;
-          id(g_cur_page) = 1;
-      - lvgl.page.show:
-          id: page_mode
-          animation: NONE
-      - script.execute: alarm_render
-      - media_player.speaker.play_on_device_media_file:
-          id: media_player_speaker
-          media_file: alarm_sound
-          announcement: true
-      - lambda: 'id(g_ring_cur) = -1;'
-      - script.execute: haptic_update
-      - script.execute: haptic_bump
-      - script.execute: haptic_bump
+      - if:
+          condition: { lambda: 'return id(g_mode) == 4;' }
+          then: []
+          else:
+            - lambda: 'id(g_idle_ticks) = 0;'
+            - if:
+                condition: { lambda: 'return id(g_disp_off);' }
+                then:
+                  - light.turn_on:
+                      id: backlight_light
+                      brightness: !lambda 'return id(g_bright) / 100.0f;'
+                  - lambda: 'id(g_disp_off) = false;'
+            - lambda: |-
+                id(g_mode) = 4;
+                id(g_alarm_cnt) = 0;
+                id(g_alarm_flash) = true;
+                id(g_timer_active) = false;
+                id(g_timer_paused) = false;
+                id(g_timer_secs) = 0;
+                id(g_cur_page) = 1;
+            - lvgl.page.show:
+                id: page_mode
+                animation: NONE
+            - script.execute: alarm_render
+            - lambda: 'id(g_ring_cur) = -1;'
+            - script.execute: haptic_update
+            - script.execute: haptic_bump
+            - script.execute: haptic_bump
+            - media_player.speaker.play_on_device_media_file:
+                id: media_player_speaker
+                media_file: alarm_sound
+                announcement: true
   - id: alarm_stop
     then:
-      - lambda: 'id(g_mode) = 0; id(g_timer_active) = false; id(g_timer_paused) = false; id(g_timer_secs) = 0;'
+      - lambda: 'id(g_mode) = 0; id(g_timer_active) = false; id(g_timer_paused) = false; id(g_timer_secs) = 0; id(g_alarm_flash) = false;'
       - script.execute: ui_render
       - script.execute: timer_render
   # Knob CCW (anticlockwise) - same routing as the old K718 pulse-left handler.
@@ -1433,7 +1456,7 @@ script:
           text: "ALARM"
       - lvgl.widget.update:
           id: ui_head_bg
-          bg_color: 0xFF5555
+          bg_color: !lambda 'return id(g_alarm_flash) ? 0xFF5555 : 0xAA2222;'
   # --- Timer as a SCREEN (page_timer): render + button controls ---
   - id: timer_render
     then:
@@ -2418,6 +2441,14 @@ interval:
                   - drv2605.play_effect:
                       id: haptic_driver
                       effect: 16
+  # Alarm header blink (lightweight - no full ui_render).
+  - interval: 500ms
+    then:
+      - if:
+          condition: { lambda: 'return id(g_mode) == 4;' }
+          then:
+            - lambda: 'id(g_alarm_flash) = !id(g_alarm_flash);'
+            - script.execute: alarm_render
   # Boot splash: type out "HELLO!" then cross-fade to the clock (~5 s), once at startup.
   - interval: 150ms
     then:
@@ -2449,6 +2480,13 @@ interval:
           if (bs > 0 && id(g_idle_ticks) * 2 >= bs) off = true;
           if (id(g_va_active) || id(g_mode) == 3 || id(g_mode) == 4) off = false;
           id(g_want_off) = off;
+      - if:
+          condition: { lambda: 'return id(g_mode) == 4 && id(g_disp_off);' }
+          then:
+            - light.turn_on:
+                id: backlight_light
+                brightness: !lambda 'return id(g_bright) / 100.0f;'
+            - lambda: 'id(g_disp_off) = false; id(g_idle_ticks) = 0;'
       - if:
           condition: { lambda: 'return id(g_want_off) && !id(g_disp_off);' }
           then:
@@ -2489,13 +2527,11 @@ interval:
           then:
             - lambda: 'id(g_timer_secs)--;'
             - if:
-                condition: { lambda: 'return !(id(g_timer_local) && id(g_timer_secs) <= 0);' }
-                then:
-                  - script.execute: timer_render
-            - if:   # button timer reached zero -> alarm (with VA the alarm fires on on_timer_finished)
                 condition: { lambda: 'return id(g_timer_local) && id(g_timer_secs) <= 0;' }
                 then:
                   - script.execute: alarm_start
+                else:
+                  - script.execute: timer_render
       # Timer badge on the home screen (red) - time left (rounded up to minutes)
       - if:
           condition: { lambda: 'return id(g_timer_active);' }
