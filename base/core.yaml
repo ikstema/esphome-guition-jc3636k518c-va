@@ -1456,7 +1456,7 @@ script:
           text: "ALARM"
       - lvgl.widget.update:
           id: ui_head_bg
-          bg_color: !lambda 'return id(g_alarm_flash) ? 0xFF5555 : 0xAA2222;'
+          bg_color: 0xFF5555
   # --- Timer as a SCREEN (page_timer): render + button controls ---
   - id: timer_render
     then:
@@ -2447,8 +2447,14 @@ interval:
       - if:
           condition: { lambda: 'return id(g_mode) == 4;' }
           then:
-            - lambda: 'id(g_alarm_flash) = !id(g_alarm_flash);'
-            - script.execute: alarm_render
+            - if:
+                condition: { lambda: 'return id(g_alarm_flash);' }
+                then:
+                  - lvgl.widget.update: { id: ui_head_bg, bg_color: 0xAA2222 }
+                  - lambda: 'id(g_alarm_flash) = false;'
+                else:
+                  - lvgl.widget.update: { id: ui_head_bg, bg_color: 0xFF5555 }
+                  - lambda: 'id(g_alarm_flash) = true;'
   # Boot splash: type out "HELLO!" then cross-fade to the clock (~5 s), once at startup.
   - interval: 150ms
     then:
