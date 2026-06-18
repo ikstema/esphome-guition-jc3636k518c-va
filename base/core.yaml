@@ -1203,10 +1203,9 @@ script:
           id(g_timer_active) = false;
           id(g_timer_paused) = false;
           id(g_timer_secs) = 0;
-          id(g_base) = 0;
           id(g_cur_page) = 1;
       - lvgl.page.show:
-          id: page_home
+          id: page_mode
           animation: NONE
       - script.execute: alarm_render
       - media_player.speaker.play_on_device_media_file:
@@ -1411,6 +1410,21 @@ script:
       - script.execute: haptic_update
   - id: alarm_render
     then:
+      - lvgl.widget.show: ui_dim
+      - lvgl.widget.show: ui_head_bg
+      - lvgl.widget.show: ui_head
+      - lvgl.widget.show: ui_big
+      - lvgl.widget.hide: ui_sub
+      - lvgl.widget.hide: ui_bar
+      - lvgl.widget.hide: disp_roller
+      - lvgl.widget.hide: disp_lbl
+      - lvgl.widget.hide: disp_switch
+      - lvgl.widget.hide: asys_roller
+      - lvgl.widget.hide: sys_roller
+      - lvgl.widget.hide: ring_roller
+      - lvgl.widget.hide: home_roller
+      - lvgl.widget.hide: wid_roller
+      - lvgl.widget.hide: wopt_roller
       - lvgl.label.update:
           id: ui_big
           text: "0:00"
@@ -2496,12 +2510,6 @@ interval:
                   return std::string(b);
           else:
             - lvgl.widget.hide: lbl_timer
-      - if:   # refresh the alarm overlay every second
-          condition:
-            lambda: 'return id(g_mode) == 4;'
-          then:
-            - script.execute: alarm_render
-            - script.execute: haptic_bump
       - if:   # alarm: repeat the sound every ~2 s
           condition:
             lambda: 'return id(g_mode) == 4;'
