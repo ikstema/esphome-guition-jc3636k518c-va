@@ -269,7 +269,9 @@ psram:
   speed: 80MHz
 
 external_components:
-  - source: github://RAR/esphome-drv2605
+  - source:
+      type: local
+      path: components
     components: [drv2605]
 
 logger:
@@ -882,7 +884,7 @@ script:
             if (id(vol_sensor).has_state()) v = (float) id(vol_sensor).state;
             else v = 0.5f;
           }
-          v += 0.05f;
+          v += 0.02f;
           if (v > 1.0f) v = 1.0f;
           id(g_vol) = v;
       - lvgl.arc.update:
@@ -912,7 +914,7 @@ script:
             if (id(vol_sensor).has_state()) v = (float) id(vol_sensor).state;
             else v = 0.5f;
           }
-          v -= 0.05f;
+          v -= 0.02f;
           if (v < 0.0f) v = 0.0f;
           id(g_vol) = v;
       - lvgl.arc.update:
@@ -1195,14 +1197,26 @@ script:
       - script.execute: ui_render
   - id: alarm_start
     then:
-      - lambda: 'id(g_mode) = 4; id(g_alarm_cnt) = 0; id(g_timer_active) = false; id(g_timer_paused) = false; id(g_timer_secs) = 0;'
-      - script.execute: ui_render
-      - script.execute: timer_render
+      - lambda: |-
+          id(g_mode) = 4;
+          id(g_alarm_cnt) = 0;
+          id(g_timer_active) = false;
+          id(g_timer_paused) = false;
+          id(g_timer_secs) = 0;
+          id(g_base) = 0;
+          id(g_cur_page) = 1;
+      - lvgl.page.show:
+          id: page_home
+          animation: NONE
+      - script.execute: alarm_render
       - media_player.speaker.play_on_device_media_file:
           id: media_player_speaker
           media_file: alarm_sound
           announcement: true
+      - lambda: 'id(g_ring_cur) = -1;'
       - script.execute: haptic_update
+      - script.execute: haptic_bump
+      - script.execute: haptic_bump
   - id: alarm_stop
     then:
       - lambda: 'id(g_mode) = 0; id(g_timer_active) = false; id(g_timer_paused) = false; id(g_timer_secs) = 0;'
@@ -1319,36 +1333,48 @@ script:
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 1;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_sequence:
                 id: haptic_driver
                 effects: [16, 16, 16]
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 21;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_effect:
                 id: haptic_driver
                 effect: 7
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 22;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_effect:
                 id: haptic_driver
                 effect: 10
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 23;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_effect:
                 id: haptic_driver
                 effect: 52
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 5;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_effect:
                 id: haptic_driver
                 effect: 7
       - if:
           condition: { lambda: 'return id(g_ring_cur) == 3;' }
           then:
+            - drv2605.wake:
+                id: haptic_driver
             - drv2605.play_effect:
                 id: haptic_driver
                 effect: 14
@@ -1383,38 +1409,53 @@ script:
       - delay: 2000ms
       - lambda: 'id(g_vol_show) = false; id(g_ring_cur) = -1;'
       - script.execute: haptic_update
+  - id: alarm_render
+    then:
+      - lvgl.label.update:
+          id: ui_big
+          text: "0:00"
+      - lvgl.label.update:
+          id: ui_head
+          text: "ALARM"
+      - lvgl.widget.update:
+          id: ui_head_bg
+          bg_color: 0xFF5555
   # --- Timer as a SCREEN (page_timer): render + button controls ---
   - id: timer_render
     then:
-      - lvgl.label.update:
-          id: timer_big
-          text: !lambda |-
-            int s = id(g_timer_active) ? id(g_timer_secs) : id(g_set_min) * 60;
-            if (s < 0) s = 0;
-            char b[12]; snprintf(b, sizeof(b), "%d:%02d", s / 60, s % 60);
-            return std::string(b);
-      - lvgl.arc.update:
-          id: timer_arc
-          value: !lambda |-
-            if (!id(g_timer_active)) return 100.0f;
-            int tot = id(g_timer_total); if (tot <= 0) return 0.0f;
-            float f = 100.0f * id(g_timer_secs) / tot;
-            if (f < 0) f = 0; if (f > 100) f = 100;
-            return f;
       - if:
-          condition: { lambda: 'return id(g_timer_active);' }
-          then:
-            - lvgl.widget.hide: timer_play
-            - lvgl.widget.show: timer_pause
-            - lvgl.widget.show: timer_stop
-            - lvgl.label.update:
-                id: timer_pause_ic
-                text: !lambda 'return id(g_timer_paused) ? std::string("") : std::string("");'
+          condition: { lambda: 'return id(g_mode) == 4;' }
+          then: []
           else:
-            - lvgl.widget.show: timer_play
-            - lvgl.widget.hide: timer_pause
-            - lvgl.widget.hide: timer_stop
-      - script.execute: haptic_update
+            - lvgl.label.update:
+                id: timer_big
+                text: !lambda |-
+                  int s = id(g_timer_active) ? id(g_timer_secs) : id(g_set_min) * 60;
+                  if (s < 0) s = 0;
+                  char b[12]; snprintf(b, sizeof(b), "%d:%02d", s / 60, s % 60);
+                  return std::string(b);
+            - lvgl.arc.update:
+                id: timer_arc
+                value: !lambda |-
+                  if (!id(g_timer_active)) return 100.0f;
+                  int tot = id(g_timer_total); if (tot <= 0) return 0.0f;
+                  float f = 100.0f * id(g_timer_secs) / tot;
+                  if (f < 0) f = 0; if (f > 100) f = 100;
+                  return f;
+            - if:
+                condition: { lambda: 'return id(g_timer_active);' }
+                then:
+                  - lvgl.widget.hide: timer_play
+                  - lvgl.widget.show: timer_pause
+                  - lvgl.widget.show: timer_stop
+                  - lvgl.label.update:
+                      id: timer_pause_ic
+                      text: !lambda 'return id(g_timer_paused) ? std::string("") : std::string("");'
+                else:
+                  - lvgl.widget.show: timer_play
+                  - lvgl.widget.hide: timer_pause
+                  - lvgl.widget.hide: timer_stop
+            - script.execute: haptic_update
   - id: timer_start
     then:
       - lambda: |-
@@ -2433,7 +2474,10 @@ interval:
             lambda: 'return id(g_timer_active) && !id(g_timer_paused);'
           then:
             - lambda: 'id(g_timer_secs)--;'
-            - script.execute: timer_render
+            - if:
+                condition: { lambda: 'return !(id(g_timer_local) && id(g_timer_secs) <= 0);' }
+                then:
+                  - script.execute: timer_render
             - if:   # button timer reached zero -> alarm (with VA the alarm fires on on_timer_finished)
                 condition: { lambda: 'return id(g_timer_local) && id(g_timer_secs) <= 0;' }
                 then:
@@ -2456,7 +2500,8 @@ interval:
           condition:
             lambda: 'return id(g_mode) == 4;'
           then:
-            - script.execute: ui_render
+            - script.execute: alarm_render
+            - script.execute: haptic_bump
       - if:   # alarm: repeat the sound every ~2 s
           condition:
             lambda: 'return id(g_mode) == 4;'
