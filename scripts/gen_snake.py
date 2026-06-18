@@ -36,6 +36,7 @@ GRAY         = "0x3A3A3D"   # exit / back (neutral, same as the other games)
 TXT          = "0xC6DCC0"   # how-to / scores body text
 BADGE        = "0x6FB23F"   # how-to number badges
 HUD          = "0xCFEAE4"   # in-game score
+WORDMARK     = "0x12212D"   # dark navy of the logo "SNAKE" wordmark (readable on the logo backdrop)
 
 
 def seg_widgets():
@@ -519,8 +520,8 @@ lvgl:
             widgets:
               - label: {{ align: CENTER, text: "Scores", text_font: font_med, text_color: {BTN2_TXT} }}
         # --- GAME OVER (state 2) ---
-        - label: {{ id: lbl_sn_over, align: CENTER, x: 0, y: -10, text_align: CENTER, text: "", text_font: font_sel, text_color: 0xFFFFFF, hidden: true }}
-        - label: {{ id: lbl_sn_rec, align: CENTER, x: 0, y: 22, text_align: CENTER, text: "", text_font: font_artist, text_color: 0x9AB89A, hidden: true }}
+        - label: {{ id: lbl_sn_over, align: CENTER, x: 0, y: -10, text_align: CENTER, text: "", text_font: font_sel, text_color: {WORDMARK}, hidden: true }}
+        - label: {{ id: lbl_sn_rec, align: CENTER, x: 0, y: 22, text_align: CENTER, text: "", text_font: font_artist, text_color: {WORDMARK}, hidden: true }}
         - button:
             id: btn_sn_replay
             align: CENTER
