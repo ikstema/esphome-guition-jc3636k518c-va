@@ -71,6 +71,7 @@ void DRV2605Component::setup() {
       !this->write_register_(DRV2605_REG_SUSTAINPOS, 0x00) ||
       !this->write_register_(DRV2605_REG_SUSTAINNEG, 0x00) ||
       !this->write_register_(DRV2605_REG_BREAK, 0x00) ||
+      !this->write_register_(DRV2605_REG_AUDIOMAX, 0x64) ||
       !this->write_register_(DRV2605_REG_LIBRARY, this->library_) ||
       !this->write_register_(DRV2605_REG_MODE, DRV2605_MODE_INTTRIG)) {
     ESP_LOGE(TAG, "Failed to finish DRV2605 configuration");

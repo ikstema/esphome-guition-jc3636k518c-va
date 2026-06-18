@@ -1669,6 +1669,7 @@ spi:
 i2c:
   sda: 11
   scl: 12
+  frequency: 300kHz
   id: touchscreen_bus
   scan: true
 
@@ -1677,7 +1678,7 @@ drv2605:
   i2c_id: touchscreen_bus
   address: 0x5A
   motor_type: ERM
-  library: 1
+  library: 5
 
 output:
   - platform: ledc
@@ -1695,6 +1696,16 @@ button:
   - platform: restart
     id: btn_restart
     name: "Restart"
+  - platform: template
+    id: btn_haptic_test
+    name: "Test Haptic"
+    entity_category: diagnostic
+    on_press:
+      - drv2605.wake:
+          id: haptic_driver
+      - drv2605.play_effect:
+          id: haptic_driver
+          effect: 1
 
 touchscreen:
   platform: cst816
