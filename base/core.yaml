@@ -1345,42 +1345,14 @@ script:
   - id: haptic_bump
     mode: restart
     then:
-      - drv2605.set_realtime_value:
+      - drv2605.play_effect:
           id: haptic_driver
-          value: 127
-      - delay: 45ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 0
-      - drv2605.wake:
-          id: haptic_driver
+          effect: 7
   - id: haptic_boot_splash
     then:
-      - drv2605.set_realtime_value:
+      - drv2605.play_sequence:
           id: haptic_driver
-          value: 100
-      - delay: 45ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 0
-      - delay: 75ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 127
-      - delay: 60ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 0
-      - delay: 75ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 127
-      - delay: 90ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 0
-      - drv2605.wake:
-          id: haptic_driver
+          effects: [7, 7, 1]
   - id: haptic_vol_flash
     mode: restart
     then:
@@ -1610,8 +1582,8 @@ drv2605:
   id: haptic_driver
   i2c_id: touchscreen_bus
   address: 0x5A
-  motor_type: ERM
-  library: 5
+  motor_type: LRA
+  library: 6
 
 output:
   - platform: ledc
@@ -1634,15 +1606,9 @@ button:
     name: "Test Haptic"
     entity_category: diagnostic
     on_press:
-      - drv2605.set_realtime_value:
+      - drv2605.play_effect:
           id: haptic_driver
-          value: 127
-      - delay: 250ms
-      - drv2605.set_realtime_value:
-          id: haptic_driver
-          value: 0
-      - drv2605.wake:
-          id: haptic_driver
+          effect: 47
 
 touchscreen:
   platform: cst816

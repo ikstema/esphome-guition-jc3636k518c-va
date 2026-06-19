@@ -58,6 +58,7 @@ static const uint8_t DRV2605_MODE_REALTIME = 0x05;
 static const uint8_t DRV2605_MODE_DIAGNOS = 0x06;
 static const uint8_t DRV2605_MODE_AUTOCAL = 0x07;
 static const uint8_t DRV2605_MODE_STANDBY = 0x40;
+static const uint8_t DRV2605_MODE_RESET = 0x80;
 
 class DRV2605Component : public Component, public i2c::I2CDevice {
  public:

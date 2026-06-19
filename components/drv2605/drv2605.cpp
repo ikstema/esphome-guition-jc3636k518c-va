@@ -19,63 +19,27 @@ void DRV2605Component::setup() {
   }
   ESP_LOGCONFIG(TAG, "Detected device status=0x%02X, chip_id=0x%02X", status, status >> 5);
 
-  // Exit standby mode
-  if (!this->write_register_(DRV2605_REG_MODE, 0x00)) {
-    ESP_LOGE(TAG, "Failed to exit standby mode");
+  // Reset the DRV2605 itself. It remains powered across an ESP OTA reboot and
+  // otherwise keeps stale actuator/open-loop settings from older firmware.
+  if (!this->write_register_(DRV2605_REG_MODE, DRV2605_MODE_RESET)) {
+    ESP_LOGE(TAG, "Failed to reset DRV2605");
     this->mark_failed();
     return;
   }
-  delay(1);
+  delay(2);
 
-  // Configure the actuator. The K518 board uses an ERM motor in open-loop mode.
-  if (this->is_lra_) {
-    if (!this->write_register_(DRV2605_REG_RATEDV, 0x2F) ||
-        !this->write_register_(DRV2605_REG_CLAMPV, 0x59) ||
-        !this->write_register_(DRV2605_REG_FEEDBACK, 0xB6) ||
-        !this->write_register_(DRV2605_REG_CONTROL4, 0x30)) {
-      ESP_LOGE(TAG, "Failed to configure LRA registers");
-      this->mark_failed();
-      return;
-    }
-    // Auto-calibrate once at boot so the LRA actually moves.
-    this->set_mode_(DRV2605_MODE_AUTOCAL);
-    this->write_register_(DRV2605_REG_GO, 0x01);
-    for (int i = 0; i < 400; i++) {
-      uint8_t go = 1;
-      if (!this->read_register_(DRV2605_REG_GO, &go))
-        break;
-      if ((go & 0x01) == 0)
-        break;
-      delay(5);
-    }
-    uint8_t status_after = 0;
-    if (this->read_register_(DRV2605_REG_STATUS, &status_after) && (status_after & 0x08)) {
-      ESP_LOGW(TAG, "DRV2605 LRA autocal reported DIAG fault (status=0x%02x)", status_after);
-    } else {
-      ESP_LOGCONFIG(TAG, "DRV2605 LRA autocal finished");
-    }
-  } else {
-    uint8_t feedback = 0;
-    uint8_t control3 = 0;
-    if (!this->read_register_(DRV2605_REG_FEEDBACK, &feedback) ||
-        !this->read_register_(DRV2605_REG_CONTROL3, &control3) ||
-        !this->write_register_(DRV2605_REG_FEEDBACK, feedback & 0x7F) ||
-        !this->write_register_(DRV2605_REG_CONTROL3, control3 | 0x20)) {
-      ESP_LOGE(TAG, "Failed to configure ERM open-loop mode");
-      this->mark_failed();
-      return;
-    }
-  }
-
-  if (!this->write_register_(DRV2605_REG_RTPIN, 0x00) ||
-      !this->write_register_(DRV2605_REG_OVERDRIVE, 0x00) ||
-      !this->write_register_(DRV2605_REG_SUSTAINPOS, 0x00) ||
-      !this->write_register_(DRV2605_REG_SUSTAINNEG, 0x00) ||
-      !this->write_register_(DRV2605_REG_BREAK, 0x00) ||
-      !this->write_register_(DRV2605_REG_AUDIOMAX, 0x64) ||
+  // The Waveshare/Guition K518 schematic identifies the actuator as LRA.
+  // Use the same minimal closed-loop setup as the working RAR driver:
+  // N_ERM_LRA in FEEDBACK plus ROM library 6. Do not run calibration with
+  // guessed voltage limits; the chip's LRA library handles resonance tracking.
+  const uint8_t feedback = this->is_lra_ ? 0x80 : 0x00;
+  if (!this->write_register_(DRV2605_REG_MODE, DRV2605_MODE_INTTRIG) ||
+      !this->write_register_(DRV2605_REG_FEEDBACK, feedback) ||
+      !this->write_register_(DRV2605_REG_RTPIN, 0x00) ||
+      !this->write_register_(DRV2605_REG_GO, 0x00) ||
       !this->write_register_(DRV2605_REG_LIBRARY, this->library_) ||
       !this->write_register_(DRV2605_REG_MODE, DRV2605_MODE_INTTRIG)) {
-    ESP_LOGE(TAG, "Failed to finish DRV2605 configuration");
+    ESP_LOGE(TAG, "Failed to configure DRV2605 actuator");
     this->mark_failed();
     return;
   }
